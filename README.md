@@ -1,8 +1,36 @@
 # Wymiary
 
-Baza pod FPS-a w nieeuklidesowych i wielowymiarowych przestrzeniach. Czysty WebGL2 + raymarching (bez bibliotek, bez builda).
+Strzelanka FPS w nieeuklidesowych przestrzeniach: 4D, przestrzeń hiperboliczna i sferyczna, zapętlone pokoje,
+zmienna krzywizna, wolne światło. Gra sieciowa dla dwóch graczy.
 
-## Uruchamianie
+## Instalacja (Windows)
+
+1. Pobierz grę: **[Wymiary-main.zip](https://github.com/Scepeczki/Wymiary/archive/refs/heads/main.zip)**
+   (albo na tej stronie: zielony przycisk **Code** → **Download ZIP**).
+2. Rozpakuj ZIP (prawy przycisk → *Wyodrębnij wszystkie*).
+3. W rozpakowanym folderze uruchom **`Zainstaluj.cmd`**. Jeśli Windows ostrzeże („system Windows ochronił komputer”),
+   kliknij *Więcej informacji* → *Uruchom mimo to*.
+4. Na pulpicie pojawią się skróty. Folder z ZIP-a można potem usunąć.
+
+Potrzebna jest przeglądarka Chrome, Brave albo Edge. Uprawnienia administratora nie są potrzebne.
+
+**Aktualizacje:** skrót *Wymiary* przy każdym starcie sprawdza, czy na GitHubie jest nowa wersja, i proponuje ją pobrać
+(w menu Start jest też *Wymiary – sprawdź aktualizacje*). *Wymiary – dołącz do gry* dodatkowo wyrównuje wersję z
+serwerem, do którego się łączysz.
+
+**Gra we dwóch:** jeden gracz uruchamia *Wymiary – gra sieciowa (serwer)* (za pierwszym razem gra sama pobierze
+przenośny Node.js), drugi *Wymiary – dołącz do gry* i wpisuje adres pokazany w oknie serwera. Z innego domu:
+oba komputery w tej samej sieci [Tailscale](https://tailscale.com) → adres `100.x.x.x:8080`.
+
+## Wydawanie aktualizacji (dla autora)
+
+Zmiany zatwierdź (commit) i wypchnij (push) na gałąź **main** — np. w GitHub Desktop: *Commit to main* → *Push origin*.
+Gry u innych graczy zobaczą nową wersję przy następnym uruchomieniu. Instalatory .exe (opcjonalnie):
+`powershell -ExecutionPolicy Bypass -File tools\build-installer.ps1`.
+
+---
+
+## Uruchamianie (komputer autora)
 
 - Ikona **Wymiary** na pulpicie (albo `Wymiary.lnk` w tym folderze) — otwiera grę w Brave w trybie aplikacji.
 - Skrót odtworzysz poleceniem: `powershell -ExecutionPolicy Bypass -File tools\install-shortcut.ps1`
