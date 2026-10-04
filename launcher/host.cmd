@@ -1,5 +1,5 @@
 @echo off
-rem Wymiary — start the network game server on this computer (and open the game).
+rem Wymiary - start the network game server on this computer (and open the game).
 title Wymiary - serwer gry sieciowej
 cd /d "%~dp0.."
 set "NODE=node"
