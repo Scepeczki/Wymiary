@@ -60,6 +60,7 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
 
   const world = {
     name: 'Przestrzeń sferyczna',
+    id: 'sfera',
     subtitle: 'S³ o krzywiźnie +1 — skończony wszechświat bez brzegu. Kafelkowany ośmioma sześcianami tesseraktu (po 3 wokół krawędzi). Idź prosto, a wrócisz z drugiej strony. Mały sześcian na antypodzie wygląda jak gigant.',
     tags: ['K = +1', 'S³', 'potwory'],
     help: ['WASD ruch · Spacja skok', 'strzel prosto — pocisk okrąży świat i trafi Cię w plecy', 'podłoga: 6 kolorowych pokoi', 'idź prosto wzdłuż kolorowych bloków', 'walka: chybiony pocisk potwora okrąża świat — uważaj na plecy', 'N noclip (Spacja/Ctrl — wysokość)'],

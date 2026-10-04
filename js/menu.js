@@ -5,7 +5,7 @@
   const $ = id => document.getElementById(id);
   const M = { open: false, sel: 0 };
   const modeSel = [];          // per map: the selected mode (index into world.modes)
-  const thumb = i => `url("assets/maps/${i + 1}.jpg")`;
+  const thumb = i => `url("assets/maps/${WE.worlds[i].id || i + 1}.jpg")`;
   const fightModes = w => (w.modes || []).map((m, i) => (/potwor|walka|bot/i.test(m.label) ? i : -1)).filter(i => i >= 0);
 
   function buildList() {
@@ -168,7 +168,7 @@
   M.show = function (open) {
     M.open = open;
     $('menu').classList.toggle('open', open);
-    for (const id of ['hud', 'cross', 'wset', 'duel', 'health', 'mini', 'ammo', 'split']) { const e = $(id); if (e) e.style.visibility = open ? 'hidden' : ''; }
+    for (const id of ['hud', 'cross', 'wset', 'duel', 'health', 'mini', 'ammo', 'split', 'gizmo', 'layer', 'tut', 'viewlabel']) { const e = $(id); if (e) e.style.visibility = open ? 'hidden' : ''; }
     $('help').style.opacity = open ? 0 : 0.8;
     if (open) select(WE.worldIndex >= 0 ? WE.worldIndex : M.sel);
   };
@@ -194,7 +194,7 @@
       const cols = Math.max(1, Math.round($('mapList').clientWidth / 264));
       const k = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: cols, ArrowUp: -cols }[e.code];
       if (k) { e.preventDefault(); select(WM.clamp(M.sel + k, 0, WE.worlds.length - 1)); }
-      if (e.code.startsWith('Digit')) { const n = +e.code.slice(5); if (n >= 1 && n <= WE.worlds.length) select(n - 1); }
+      if (e.code.startsWith('Digit')) { const n = +e.code.slice(5) || 10; if (n <= WE.worlds.length) select(n - 1); }
       if (e.code === 'Enter' || e.code === 'NumpadEnter') { e.preventDefault(); play(); }
     });
     WE.onFrame = () => {
@@ -209,6 +209,14 @@
       // split screen (4D): labels, and the crosshair in the middle of the normal view
       const split = !!(w && w.splitView && w.splitView());
       $('split').style.display = split ? 'block' : 'none';
+      const vl = w && w.viewLabel ? w.viewLabel() : '';
+      $('viewlabel').style.display = vl ? 'block' : 'none';
+      if (vl && $('viewlabel').innerHTML !== vl) $('viewlabel').innerHTML = vl;
+      const tut = w && w.tutorialHtml ? w.tutorialHtml() : '';
+      $('tut').style.display = tut ? 'block' : 'none';
+      if (tut && $('tut').innerHTML !== tut) $('tut').innerHTML = tut;
+      $('help').style.display = tut ? 'none' : '';
+      if (tut) $('wset').style.display = 'none';
       $('cross').style.left = split ? '25%' : ''; $('cross').style.top = split ? '25%' : '';
       const net = WMP.status();
       if ($('net').textContent !== net) $('net').textContent = net;

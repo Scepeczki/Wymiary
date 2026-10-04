@@ -103,6 +103,7 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
 
   const world = {
     name: 'Wyspy 4D',
+    id: 'wyspy',
     subtitle: 'Platformy nad przepaścią. Każda jest czterowymiarowym prostopadłościanem: istnieje tylko w swoim zakresie w, więc gdy idziesz wzdłuż W, w twoim przekroju platformy znikają i pojawiają się. Droga do złotej platformy to skoki nad przerwami na podłodze i kroki przez W na platformę, która leży „obok” w czwartym wymiarze — w tym samym miejscu podłogi, przy innym w.',
     tags: ['4D', 'parkour przez oś W', 'wyścig z czasem'],
     help: ['cel: złota platforma (kompas: META) — mapka pokazuje wszystkie platformy w (x, y, w)', 'fioletowy brzeg platformy = jej koniec w osi W', 'gdy następnej wyspy nie widać: jest obok w W (T / G, kółko)', 'spadniesz → wracasz na ostatnią wyspę', ...W4D.HELP],

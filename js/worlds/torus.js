@@ -98,6 +98,7 @@ vec3 material(float id, vec3 p, vec3 n, inout float emit){
 
   const world = {
     name: 'Pętla (3-torus)',
+    id: 'petla',
     subtitle: 'Skończony pokój bez ścian: każda strona sklejona z przeciwną. Widzisz nieskończenie wiele kopii pokoju — i siebie. Wpadnij w dziurę w podłodze.',
     tags: ['3-torus', 'kopie ciebie', 'potwory'],
     help: ['WASD ruch · Spacja skok · Shift bieg', 'strzel poziomo — pocisk wróci z drugiej strony', 'pomarańczowe postacie = Ty', 'dziura w podłodze → spadasz z sufitu', 'walka: potwory też mają nieskończenie wiele kopii — strzelaj do najbliższej', 'N noclip'],

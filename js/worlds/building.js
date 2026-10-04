@@ -348,6 +348,7 @@ vec3 light(vec3 p, vec3 n, vec3 rd, vec3 alb, float ao){
   const horde = new WHorde(null, { metric, sdf, los, nodes: NODES, next, nearestNode, spawns: SPAWNS });
   const world = {
     name: 'Korytarze K',
+    id: 'korytarze',
     subtitle: 'Budynek z 25 pokoi połączonych korytarzami — prawie każdy pokój i korytarz ma WŁASNĄ krzywiznę: pomarańczowe K>0 (sferyczne, soczewka), niebieskie K<0 (hiperboliczne). Suwakiem dokładasz krzywiznę K całej mapy. W trybie z potworami każdy potwór nosi bańkę zakrzywionej przestrzeni, a ich pociski to latające soczewki.',
     tags: ['25 pokoi, każdy z własnym K', 'potwory', 'suwak K'],
     help: ['WASD ruch · Spacja skok · Shift bieg', 'kolor ścian = krzywizna pokoju: pomarańczowy K>0, niebieski K<0', 'w rogu: lokalne K tam, gdzie stoisz', 'Q / E — K całej mapy · X — płasko', 'potwory: 3 trafienia', 'N noclip'],

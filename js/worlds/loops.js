@@ -753,6 +753,7 @@ vec3 material(float id, vec3 p, vec3 n, inout float emit){
   const capsule = (q, feet) => Math.hypot(q[0] - feet[0], q[1] - WM.clamp(q[1], feet[1] + 0.1, feet[1] + 1.6), q[2] - feet[2]) < 0.42;
   const world = {
     name: 'Arena pętli',
+    id: 'arena',
     subtitle: 'Długa mapa: dwie bazy i trzy ścieżki, w których prawie każde miejsce jest zapętlone — bazy i węzły ciągną się w bok bez końca, schody Penrose\'a (wchodzisz w górę, a jesteś na tym samym poziomie), budka większa w środku, sala ze studnią i mostkiem, korytarz z trzema sklejonymi bocznymi przejściami, hala bez podłogi i plac-torus. Pojedynek z botem albo gra sieciowa z drugim graczem.',
     tags: ['pojedynek', 'bot', 'gra sieciowa'],
     help: ['WASD ruch · Spacja skok · Shift bieg', 'LPM strzał · R przeładuj (12 naboi)', 'mapka: kolorowe linie = sklejone miejsca', 'Esc — menu (tryb gry)', 'N noclip'],

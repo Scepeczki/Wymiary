@@ -150,6 +150,7 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
 
   const world = {
     name: 'Labirynt 4D',
+    id: 'labirynt',
     subtitle: 'Labirynt 4 × 4 × 3 komór rozłożonych po podłodze (x, y) i po czwartej osi w. Podłoga jest tylko w labiryncie, a w niektórych komorach ma dziurę tylko w połowie zakresu W — w tym samym miejscu podłogi przy jednym w jest grunt, przy innym przepaść. Część przejść prowadzi przez W: fioletowy / błękitny kwadrat na podłodze. Znajdź złotą hiperkulę.',
     tags: ['4D', 'labirynt przez oś W', 'wyścig z czasem'],
     help: ['cel: złota hiperkula (kompas: META)', 'fioletowy kwadrat = przejście w +W (T / kółko w górę), błękitny = w −W', 'drzwi w ścianach są otwarte tylko w środku zakresu W komory', 'czerwony brzeg = dziura w podłodze (tylko przy części w)', ...W4D.HELP],

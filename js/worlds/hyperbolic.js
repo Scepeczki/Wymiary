@@ -59,6 +59,7 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
 
   const world = {
     name: 'Przestrzeń hiperboliczna',
+    id: 'hiperbola',
     subtitle: 'H³ o krzywiźnie −1. Plaster miodu {4,3,5}: sześcienne pokoje o kątach prostych, ale wokół każdej krawędzi stoi PIĘĆ sześcianów. Przestrzeń rośnie wykładniczo z odległością.',
     tags: ['K = −1', 'H³', 'potwory'],
     help: ['WASD ruch · Spacja skok', 'pociski lecą po geodezyjnych H³ — rozbiegają się wykładniczo', 'policz sześciany wokół narożnika podłogi (5!)', 'walka: ich fioletowe pociski też lecą po geodezyjnych', 'N noclip (Spacja/Ctrl — wysokość)'],

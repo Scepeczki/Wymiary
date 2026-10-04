@@ -4,29 +4,55 @@
 //  * Q / E and Z / C rotate the view into W; pressing the same key twice quickly aligns that rotation with the
 //    axes again (to 0° or 180°, whichever is nearer) — a short animated turn.
 //  * T / G and the mouse wheel step along ana / kata (your hidden 4th direction).
-//  * F: four views — 3D slices through different triples of your axes (x right, y forward, z up, w ana).
-//  * B: the 4D compass turns with you / stays fixed.   X: back to the plain 3D view (no rotation into W).
+//  * Cameras: every view is a 3D slice through a triple of your four directions (x right, y forward, z up, w ana).
+//    Y switches the single camera (x y z) → (w y z) → (x w z) → (x y w); F shows all four at once.
+//  * The axis gizmo (bottom left) shows where the world's x, y, z, w point relative to what you see, and how much
+//    of each lies outside your slice.   B: the 4D compass turns with you / stays fixed / hidden.
+//  * X: back to the plain 3D view (no rotation into W).
 (function () {
   const D = {};
   const DOUBLE = 0.33;                       // seconds between two presses that count as a double press
-  D.HELP = ['T / G albo kółko myszy — krok w osi W (ana / kata)', 'Q / E — obrót przód↔W · 2× szybko: wyrównaj do 0° / 180°',
+  D.HELP = ['T / G albo kółko myszy — krok w osi W (ana / kata)', 'Y — następna kamera: (x y z) → (w y z) → (x w z) → (x y w)', 'Q / E — obrót przód↔W · 2× szybko: wyrównaj do 0° / 180°',
     'Z / C — obrót prawo↔W · 2× szybko: wyrównaj', 'X — wyzeruj obrót 4D', 'F — cztery widoki: (x y z) (w y z) (x w z) (x y w)',
-    'kompas 4D w rogu · B — widok stały / za tobą', 'osie: x, y — podłoga · z — wysokość · w — czwarta oś'];
+    'gizmo osi w lewym dolnym rogu · B — kompas 4D: obraca się / stały / ukryty', 'osie: x, y — podłoga · z — wysokość · w — czwarta oś'];
 
+  // the cameras: [shown name, what it is]; basis (screen right, screen up, depth) from your four directions
+  D.VIEWS = [['x y z', 'zwykły widok — x w prawo, z w górę, y w głąb'], ['w y z', 'zamiast „w prawo” jest oś W — na ekranie poziomo leży W'],
+    ['x w z', 'zamiast „do przodu” jest oś W — patrzysz wzdłuż W'], ['x y w', 'zamiast wysokości jest oś W — na ekranie pionowo leży W']];
+  D.basis = function (world, v) {
+    const c = world.player.camera(), A = world.player.frame[2];
+    return [[c.right, c.up, c.fwd, A], [A, c.up, c.fwd, c.right], [c.right, c.up, A, c.fwd], [c.right, A, c.fwd, c.up]][v];   // 4th = hidden
+  };
   // shown coordinates of an engine position
   D.shown = p => ({ x: p[0], y: p[2], z: p[1], w: p[3] });
 
   // world: { player (WPlayer 4D), compass }  — call once when the world is created
   D.setup = function (world) {
     world.split = false;
+    world.view = 0;                          // the single camera (index into D.VIEWS)
+    world.compassMode = 0;                   // 0 turns with you, 1 fixed, 2 hidden
     world.splitView = () => world.split;
+    world.viewLabel = () => (!world.split && world.view ? `<b>${D.VIEWS[world.view][0]}</b> ${D.VIEWS[world.view][1]}` : '');
+    world.drawGizmo = (ctx, W, H) => D.drawGizmo(world, ctx, W, H);
+    if (world.drawOverlay) {
+      const draw = world.drawOverlay;
+      world.drawOverlay = function (...a) { return world.compassMode === 2 ? false : draw.apply(this, a); };
+    }
     world.snap = null;                       // running alignment turn: { a: frame index, left: angle still to turn }
     world.anaQueue = 0;                      // mouse wheel: distance still to step along ana
     world.settings = (world.settings || []).concat([{ label: 'Cztery widoki (F)', type: 'toggle', get: () => world.split, set: v => { world.split = v; } }]);
     const last = {};
     window.addEventListener('keydown', e => {
       if (e.repeat || WE.world !== world || !WE.locked) return;
-      if (e.code === 'KeyB' && world.compass) world.compass.follow = !world.compass.follow;
+      if (e.code === 'KeyB' && world.compass) {
+        world.compassMode = (world.compassMode + 1) % 3;
+        world.compass.follow = world.compassMode === 0;
+        WE.toast(['Kompas 4D: obraca się z tobą', 'Kompas 4D: stały', 'Kompas 4D: ukryty'][world.compassMode], 1200);
+      }
+      if (e.code === 'KeyY') {
+        world.view = (world.view + 1) % 4; world.split = false;
+        WE.toast(`Kamera (${D.VIEWS[world.view][0]}): ${D.VIEWS[world.view][1]}`, 2500);
+      }
       if (e.code === 'KeyF') { world.split = !world.split; WE.toast(world.split ? 'Cztery widoki: (x y z) · (w y z) · (x w z) · (x y w)' : 'Jeden widok'); }
       // double press of a rotation key: align that rotation plane with the axes
       const plane = { KeyQ: 1, KeyE: 1, KeyZ: 0, KeyC: 0 }[e.code];
@@ -91,19 +117,67 @@
   // F: four views of the same moment, each a 3D slice through a different triple of your axes
   // (shown names: x = your right, y = forward, z = up, w = ana)
   D.drawViews = function (world, gl, prog, cw, ch) {
-    if (!world.split) return false;
-    const hw = Math.floor(cw / 2), hh = Math.floor(ch / 2), c = world.player.camera(), A = world.player.frame[2];
-    //            (x y z) normal         (w y z) right → W      (x w z) forward → W      (x y w) up → W
-    const views = [[0, hh, c.right, c.up, c.fwd], [hw, hh, A, c.up, c.fwd], [0, 0, c.right, c.up, A], [hw, 0, c.right, A, c.fwd]];
-    views.forEach(([x, y, r, u, f], i) => {
-      gl.viewport(x, y, hw, hh);
-      gl.uniform2f(prog.u('uRes'), hw, hh);
+    const draw = (v, x, y, w, h, gun) => {
+      const [r, u, f] = D.basis(world, v);
+      gl.viewport(x, y, w, h);
+      gl.uniform2f(prog.u('uRes'), w, h);
       gl.uniform2f(prog.u('uViewOff'), x, y);
       gl.uniformMatrix3x4fv(prog.u('uBasis'), false, new Float32Array([...r, ...u, ...f]));
-      if (i === 1) gl.uniform1f(prog.u('uGunShow'), 0);    // the pistol only in the normal view
+      if (!gun) gl.uniform1f(prog.u('uGunShow'), 0);     // the pistol only in the normal camera
       gl.drawArrays(gl.TRIANGLES, 0, 3);
-    });
+    };
+    if (world.split) {
+      const hw = Math.floor(cw / 2), hh = Math.floor(ch / 2);
+      [[0, hh], [hw, hh], [0, 0], [hw, 0]].forEach(([x, y], v) => draw(v, x, y, hw, hh, v === 0));
+      return true;
+    }
+    if (!world.view) return false;
+    draw(world.view, 0, 0, cw, ch, false);
     return true;
+  };
+
+  // The axis gizmo: where the world's axes point relative to the camera you look through. Screen right / up are
+  // drawn as they are, the depth slants up and right; the part of an axis that lies OUTSIDE your 3D slice (along
+  // the hidden 4th direction) is drawn as a violet ring around its tip, with its share in percent.
+  D.AXES = [['x', [1, 0, 0, 0], '#ff6b6b'], ['y', [0, 0, 1, 0], '#5ee08a'], ['z', [0, 1, 0, 0], '#5aa9ff'], ['w', [0, 0, 0, 1], '#d77bff']];
+  D.drawGizmo = function (world, ctx, W, H) {
+    const [r, u, f, hdn] = D.basis(world, world.split ? 0 : world.view);
+    const cx = W * 0.5, cy = H * 0.55, S = W * 0.3, dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+    ctx.save();
+    ctx.fillStyle = 'rgba(6,4,16,.55)'; ctx.strokeStyle = 'rgba(255,255,255,.18)';
+    ctx.beginPath(); ctx.arc(cx, cy, W * 0.38, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.font = 'bold 11px system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillText('OSIE ŚWIATA', cx, 14);
+    ctx.font = '10px system-ui, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,.5)';
+    ctx.fillText(world.split ? 'dla kamery (x y z)' : `dla kamery (${D.VIEWS[world.view][0]})`, cx, 27);
+    // farther axes first
+    const axes = D.AXES.map(([k, e, col]) => ({ k, col, a: dot(e, r), b: dot(e, u), c: dot(e, f), h: dot(e, hdn) }))
+      .sort((p, q) => q.c - p.c);
+    for (const x of axes) {
+      const px = cx + S * (x.a + x.c * 0.38), py = cy - S * (x.b + x.c * 0.3), len = Math.hypot(px - cx, py - cy);
+      ctx.strokeStyle = x.col; ctx.fillStyle = x.col; ctx.lineWidth = 3; ctx.globalAlpha = x.c < -0.2 ? 0.55 : 1;
+      if (len > 4) {
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(px, py); ctx.stroke();
+        const ang = Math.atan2(py - cy, px - cx);
+        ctx.beginPath(); ctx.moveTo(px, py);
+        ctx.lineTo(px - 9 * Math.cos(ang - 0.4), py - 9 * Math.sin(ang - 0.4)); ctx.lineTo(px - 9 * Math.cos(ang + 0.4), py - 9 * Math.sin(ang + 0.4));
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      // the hidden part: outside the slice you see
+      const hid = Math.abs(x.h);
+      if (hid > 0.04) {
+        ctx.strokeStyle = 'rgba(215,123,255,.9)'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.arc(len > 4 ? px : cx, len > 4 ? py : cy, 6 + 16 * hid, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+      }
+      ctx.font = 'bold 15px system-ui, sans-serif'; ctx.fillStyle = x.col;
+      const lx = len > 4 ? px + (px - cx) / len * 14 : cx, ly = len > 4 ? py + (py - cy) / len * 14 + 5 : cy + 34;
+      ctx.fillText(x.k + (len <= 4 ? ' ⊙' : ''), lx, ly);
+      if (hid > 0.04) { ctx.font = '10px system-ui, sans-serif'; ctx.fillText(`${Math.round(hid * 100)}% poza`, lx, ly + 12); }
+    }
+    ctx.font = '10px system-ui, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.fillText('x, y — podłoga · z — wysokość · w — 4. oś', cx, H - 8);
+    ctx.restore();
   };
 
   D.stats = function (world) {

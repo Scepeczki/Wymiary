@@ -56,7 +56,8 @@ Postęp widać w zakładce **Actions** repozytorium, gotowe wydania w **Releases
 | Ctrl + kółko | FOV · **[ ]** rozdzielczość renderu · **N** noclip · **V** dźwięk wł./wył. |
 | 4D: T/G, kółko | krok w osi W (ana / kata) |
 | 4D: Q/E, Z/C | obrót przód↔W, obrót prawo↔W · **dwa szybkie naciśnięcia** tego samego klawisza wyrównują ten obrót do osi (do 0° albo 180°, bliżej którego jesteś) |
-| 4D: X, B | reset obrotu 4D, kompas 4D: widok stały / za tobą |
+| 4D: Y | następna **kamera**: (x y z) → (w y z) → (x w z) → (x y w) — każda to przekrój przez inną trójkę twoich kierunków |
+| 4D: X, B | reset obrotu 4D · kompas 4D: obraca się z tobą / stały / ukryty |
 | 4D: F | **cztery widoki** naraz — przekroje przez różne trójki twoich osi (x = w prawo, y = do przodu, z = w górę, w = ana): (x y z) zwykły, (w y z) zamiast „w prawo” oś W, (x w z) patrzysz wzdłuż W, (x y w) zamiast wysokości oś W (poziomy przekrój 3D na wysokości oczu) |
 | Korytarze K: Q/E, X | K całej mapy, płasko (to samo suwakiem w menu); tryb z potworami wybierasz na karcie mapy |
 | Wolne światło: Q/E, L, F, B/J/K | prędkość światła, wszystkie lampy, lampa na celowniku, aberracja / Doppler / opóźnienie światła |
@@ -64,24 +65,35 @@ Postęp widać w zakładce **Actions** repozytorium, gotowe wydania w **Releases
 ## Światy
 
 1. **Korytarze K** — patrz niżej.
-2. **Tesserakt 4D** — prawdziwe 4D (x,y,z,w); widzisz przekrój 3D. Start w klatce, z której wychodzi się przez W.
+2. **Samouczek 4D** — **zacznij tutaj**: 11 lekcji z wyjaśnieniami i zadaniami sprawdzanymi automatycznie. Osie x, y, z
+   (strzałki w świecie i gizmo osi) → czwarta oś w i czym jest przekrój → hiperkula i brama, która istnieje tylko dla części w →
+   obroty w W (Q / E, Z / C) i wyrównywanie dwukrotnym naciśnięciem → każda kamera osobno: co pokazuje i jak ją sobie
+   wyobrazić (szereg słupów ułożonych wzdłuż W widać w (w y z) obok siebie, w (x w z) jako aleję w głąb, w (x y w) jako
+   wieżę) → cztery kamery naraz → sprawdzian (klatka ze ścianami grubymi tylko w W). Enter — dalej, Backspace — wstecz,
+   lekcję można wybrać suwakiem w menu. Test: `node tools/dev/tutorial.js`.
+3. **Tesserakt 4D** — prawdziwe 4D (x,y,z,w); widzisz przekrój 3D. Start w klatce, z której wychodzi się przez W.
    W rogu **kompas 4D**: pion (y) nigdy się nie obraca, więc cały ruch i obroty dzieją się w 3-wymiarowej przestrzeni
    (x, z, w) — kompas rysuje ją jako model 3D (podłoga mapki = x/z, pion mapki = W): Ty ze śladem, płaszczyzna
    przekroju, który widzisz, kierunek przodu, ukryty kierunek ana (T) i punkty orientacyjne (`js/compass4d.js`).
-3. **Przestrzeń hiperboliczna** — H³ (model hiperboloidy), plaster {4,3,5}: pięć sześcianów wokół każdej krawędzi.
-4. **Przestrzeń sferyczna** — S³, skończony świat z 8 sześcianów tesseraktu; obiekt na antypodzie wypełnia niebo.
-5. **Pętla (3-torus)** — pokój sklejony sam ze sobą; widzisz nieskończenie wiele swoich kopii.
-6. **Wolne światło** — szczególna teoria względności z regulowanym c (patrz niżej).
-7. **Arena pętli** — długa mapa dwóch baz, prawie wszędzie zapętlona; bot albo gra sieciowa (patrz niżej).
-8. **Labirynt 4D** — 4 × 4 × 3 komory rozłożone po podłodze (x, y) i po osi w. Podłoga jest tylko w labiryncie, a w części
+4. **Labirynt 4D** — 4 × 4 × 3 komory rozłożone po podłodze (x, y) i po osi w. Podłoga jest tylko w labiryncie, a w części
    komór ma dziurę tylko w połowie zakresu W (w tym samym miejscu przy jednym w grunt, przy innym przepaść). Drzwi w ścianach
    są otwarte tylko w środku zakresu W komory; część przejść prowadzi przez W (fioletowy / błękitny kwadrat na podłodze).
    Cel: złota hiperkula, czas i rekord. Labirynt jest losowany ze stałym ziarnem (ten sam u wszystkich graczy).
-9. **Wyspy 4D** — platformy nad przepaścią; każda to prostopadłościan 4D istniejący tylko w swoim zakresie w. Trasa łączy
+5. **Wyspy 4D** — platformy nad przepaścią; każda to prostopadłościan 4D istniejący tylko w swoim zakresie w. Trasa łączy
    skoki nad przerwami na podłodze z krokami przez W na platformę „obok” w czwartym wymiarze. Kompas pokazuje wszystkie
    platformy w (x, y, w). Spadniesz — wracasz na ostatnią wyspę. Test przejezdności trasy: `node tools/dev/islands.js`.
 
-**Osie w 4D** (wszystkie mapy 4D, HUD i kompas): x i y to podłoga, z to wysokość, w to czwarta oś. (W kodzie silnika oś
+6. **Przestrzeń hiperboliczna** — H³ (model hiperboloidy), plaster {4,3,5}: pięć sześcianów wokół każdej krawędzi.
+7. **Przestrzeń sferyczna** — S³, skończony świat z 8 sześcianów tesseraktu; obiekt na antypodzie wypełnia niebo.
+8. **Pętla (3-torus)** — pokój sklejony sam ze sobą; widzisz nieskończenie wiele swoich kopii.
+9. **Wolne światło** — szczególna teoria względności z regulowanym c (patrz niżej).
+10. **Arena pętli** — długa mapa dwóch baz, prawie wszędzie zapętlona; bot albo gra sieciowa (patrz niżej).
+
+W grze mapy 1–9 wybierasz cyframi, a mapę 10 (Arena pętli) klawiszem **0**.
+
+**Osie w 4D** (wszystkie mapy 4D, HUD i kompas): x i y to podłoga, z to wysokość, w to czwarta oś. W lewym dolnym rogu
+stale widać **gizmo osi**: dokąd wskazują osie świata względem kamery, przez którą patrzysz, i jaka ich część leży poza
+twoim przekrojem (fioletowe kółko z procentami; oś zupełnie poza przekrojem to ⊙). (W kodzie silnika oś
 pionowa nazywa się y — `js/nd4.js` przelicza nazwy.) Wspólne sterowanie map 4D jest w `js/nd4.js`.
 
 **Na każdej mapie da się grać.** Menu (Esc) pokazuje karty map z podglądem. Po wybraniu mapy po prawej widać opis,

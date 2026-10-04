@@ -96,6 +96,7 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
 
   const world = {
     name: 'Tesserakt 4D',
+    id: 'tesserakt',
     subtitle: 'Czterowymiarowy świat (x, y — podłoga, z — wysokość, w — czwarta oś). Widzisz trójwymiarowy przekrój. Jesteś zamknięty w pokoju — ale ściany mają grubość tylko w osi W. Wyjdź przez czwarty wymiar. Podłoga ciągnie się tu przez całą oś W; mapy Labirynt 4D i Wyspy 4D mają podłogę tylko tam, gdzie coś stoi.',
     tags: ['4D', 'potwory z osi W', 'kompas 4D'],
     help: ['pociski lecą w 4D: po obrocie w W znikają z przekroju', ...W4D.HELP, 'walka: czerwone kropki na kompasie = potwory (mogą być obok w osi W!)', 'kolor = współrzędna W'],

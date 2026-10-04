@@ -225,8 +225,8 @@
       E.keys[e.code] = true;
       if (e.repeat) return;
       if (e.code.startsWith('Digit')) {
-        const n = +e.code.slice(5);
-        if (n >= 1 && n <= E.worlds.length) E.switchWorld(n - 1);
+        const n = +e.code.slice(5) || 10;   // 0 = map 10
+        if (n <= E.worlds.length) E.switchWorld(n - 1);
       }
       if (e.code === 'KeyM' || e.code === 'Tab' || e.code === 'KeyH') E.unlock();
       if (e.code === 'KeyR' && E.world && E.world.bullets) WGun.reload();
@@ -287,16 +287,26 @@
       else gl.drawArrays(gl.TRIANGLES, 0, 3);
       if (E.afterDraw) E.afterDraw();
 
-      // optional 2D overlay of the world (e.g. the 4D compass)
+      // optional 2D overlays of the world: a corner panel (e.g. the 4D compass; drawOverlay may return false to hide it),
+      // the axis gizmo (4D maps) and a full-screen layer (labels in the tutorial)
       const mini = document.getElementById('mini');
       if (w.drawOverlay) {
-        mini.style.display = 'block';
         const sz = w.overlaySize || [300, 300];
         if (mini.width !== sz[0] || mini.height !== sz[1]) { mini.width = sz[0]; mini.height = sz[1]; mini.style.width = sz[0] + 'px'; mini.style.height = sz[1] + 'px'; }
         const ctx = mini.getContext('2d');
         ctx.clearRect(0, 0, mini.width, mini.height);
-        w.drawOverlay(ctx, mini.width, mini.height, dt);
+        mini.style.display = w.drawOverlay(ctx, mini.width, mini.height, dt) === false ? 'none' : 'block';
       } else mini.style.display = 'none';
+      for (const [id, fn, full] of [['gizmo', 'drawGizmo', false], ['layer', 'drawLayer', true]]) {
+        const cv = document.getElementById(id);
+        if (!cv) continue;
+        if (!w[fn]) { cv.style.display = 'none'; continue; }
+        cv.style.display = 'block';
+        if (full && (cv.width !== window.innerWidth || cv.height !== window.innerHeight)) { cv.width = window.innerWidth; cv.height = window.innerHeight; }
+        const ctx = cv.getContext('2d');
+        ctx.clearRect(0, 0, cv.width, cv.height);
+        w[fn](ctx, cv.width, cv.height, dt);
+      }
 
       autoT += dt;
       if (autoT > 0.25) {
