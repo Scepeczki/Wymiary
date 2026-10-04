@@ -1,6 +1,6 @@
 // 3D compass for a 4D world. "Up" (y) never rotates in the 4D worlds, so all turning and moving happens in the
 // horizontal space (x, z, w) — which is 3-dimensional. The compass draws that space as a small 3D model:
-// the minimap's floor is the real x/z plane, its vertical axis is W.
+// the minimap's floor is the real floor (shown x / y; engine x / z), its vertical axis is W.
 // Shown: axes, the player with a trail, the 2D floor of the 3D slice you currently see (a plane in xzw),
 // your forward direction, the hidden direction (normal of the slice = "into W"), and landmarks.
 (function () {
@@ -103,7 +103,7 @@
       // world axes gizmo (bottom-left)
       const gx = 36, gy = H - 34, gs = 20;
       const gz = v => { const xr = v[0] * cy - v[1] * sy, zr = v[0] * sy + v[1] * cy; return [gx + xr * gs, gy - (v[2] * cp - zr * sp) * gs]; };
-      for (const [v, col, t] of [[[1, 0, 0], COL.x, 'X'], [[0, 1, 0], COL.z, 'Z'], [[0, 0, 1], COL.w, 'W']]) {
+      for (const [v, col, t] of [[[1, 0, 0], COL.x, 'X'], [[0, 1, 0], COL.z, 'Y'], [[0, 0, 1], COL.w, 'W']]) {
         const e = gz(v);
         ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash([]);
         ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(e[0], e[1]); ctx.stroke();

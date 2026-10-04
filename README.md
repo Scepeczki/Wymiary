@@ -50,12 +50,14 @@ Postęp widać w zakładce **Actions** repozytorium, gotowe wydania w **Releases
 | WASD / mysz / Spacja / Shift | ruch, rozglądanie, skok, bieg |
 | LPM (przytrzymaj = seria) | strzał z pistoletu (magazynek 12 naboi, licznik w lewym dolnym rogu) |
 | R | przeładowanie (animacja: broń unosi się, stary magazynek wypada, nowy wchodzi; pusty magazynek przeładowuje sam) |
-| Esc / M | menu wyboru map (świat renderuje się obok, na dole suwaki mapy) · **1–7** szybki wybór |
+| Esc / M | menu wyboru map (świat renderuje się obok, na dole suwaki mapy) · **1–9** szybki wybór |
 | P | tryb projekcji: perspektywa, rybie oko 360°, panorama, perspektywa odwrócona, ortogonalna |
-| kółko myszy | **lot** w górę / w dół: unosisz się w powietrzu, dopóki znów nie staniesz na podłodze (każda mapa) |
+| kółko myszy | **lot** w górę / w dół: unosisz się w powietrzu, dopóki znów nie staniesz na podłodze; **na mapach 4D: krok w osi W** |
 | Ctrl + kółko | FOV · **[ ]** rozdzielczość renderu · **N** noclip · **V** dźwięk wł./wył. |
-| 4D: T/G, Q/E, Z/C, X, B | krok w W (ana / kata), obrót przód↔W, obrót prawo↔W, reset obrotu, kompas 4D: widok stały / za tobą |
-| 4D: F | **cztery widoki** naraz — przekroje przez różne trójki twoich osi (x = w prawo, y = w górę, z = przód, w = ana): (x y z) zwykły, (w y z) zamiast „w prawo” oś W, (x y w) patrzysz w stronę W, (x w z) zamiast pionu oś W (poziomy przekrój 3D na wysokości oczu) |
+| 4D: T/G, kółko | krok w osi W (ana / kata) |
+| 4D: Q/E, Z/C | obrót przód↔W, obrót prawo↔W · **dwa szybkie naciśnięcia** tego samego klawisza wyrównują ten obrót do osi (do 0° albo 180°, bliżej którego jesteś) |
+| 4D: X, B | reset obrotu 4D, kompas 4D: widok stały / za tobą |
+| 4D: F | **cztery widoki** naraz — przekroje przez różne trójki twoich osi (x = w prawo, y = do przodu, z = w górę, w = ana): (x y z) zwykły, (w y z) zamiast „w prawo” oś W, (x w z) patrzysz wzdłuż W, (x y w) zamiast wysokości oś W (poziomy przekrój 3D na wysokości oczu) |
 | Korytarze K: Q/E, X | K całej mapy, płasko (to samo suwakiem w menu); tryb z potworami wybierasz na karcie mapy |
 | Wolne światło: Q/E, L, F, B/J/K | prędkość światła, wszystkie lampy, lampa na celowniku, aberracja / Doppler / opóźnienie światła |
 
@@ -71,9 +73,19 @@ Postęp widać w zakładce **Actions** repozytorium, gotowe wydania w **Releases
 5. **Pętla (3-torus)** — pokój sklejony sam ze sobą; widzisz nieskończenie wiele swoich kopii.
 6. **Wolne światło** — szczególna teoria względności z regulowanym c (patrz niżej).
 7. **Arena pętli** — długa mapa dwóch baz, prawie wszędzie zapętlona; bot albo gra sieciowa (patrz niżej).
+8. **Labirynt 4D** — 4 × 4 × 3 komory rozłożone po podłodze (x, y) i po osi w. Podłoga jest tylko w labiryncie, a w części
+   komór ma dziurę tylko w połowie zakresu W (w tym samym miejscu przy jednym w grunt, przy innym przepaść). Drzwi w ścianach
+   są otwarte tylko w środku zakresu W komory; część przejść prowadzi przez W (fioletowy / błękitny kwadrat na podłodze).
+   Cel: złota hiperkula, czas i rekord. Labirynt jest losowany ze stałym ziarnem (ten sam u wszystkich graczy).
+9. **Wyspy 4D** — platformy nad przepaścią; każda to prostopadłościan 4D istniejący tylko w swoim zakresie w. Trasa łączy
+   skoki nad przerwami na podłodze z krokami przez W na platformę „obok” w czwartym wymiarze. Kompas pokazuje wszystkie
+   platformy w (x, y, w). Spadniesz — wracasz na ostatnią wyspę. Test przejezdności trasy: `node tools/dev/islands.js`.
+
+**Osie w 4D** (wszystkie mapy 4D, HUD i kompas): x i y to podłoga, z to wysokość, w to czwarta oś. (W kodzie silnika oś
+pionowa nazywa się y — `js/nd4.js` przelicza nazwy.) Wspólne sterowanie map 4D jest w `js/nd4.js`.
 
 **Na każdej mapie da się grać.** Menu (Esc) pokazuje karty map z podglądem. Po wybraniu mapy po prawej widać opis,
-**tryb gry**, suwaki mapy i jej klawisze; przycisk **GRAJ** albo Enter uruchamia grę. Strzałki i 1–7 wybierają mapę,
+**tryb gry**, suwaki mapy i jej klawisze; przycisk **GRAJ** albo Enter uruchamia grę. Strzałki i 1–9 wybierają mapę,
 dwuklik na karcie od razu ją uruchamia.
 
 - Korytarze K i Wolne światło: tryb *Z potworami*. Arena pętli: bot albo gra sieciowa.

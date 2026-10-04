@@ -110,7 +110,7 @@
 <body>
 <canvas id="c"></canvas>
 <div id="cross"></div>
-<div id="split"><div style="left:0;top:0"><b>x y z</b> zwykły widok</div><div style="left:50%;top:0"><b>w y z</b> zamiast „w prawo” — oś W</div><div style="left:0;top:50%"><b>x y w</b> patrzysz w stronę W</div><div style="left:50%;top:50%"><b>x w z</b> zamiast pionu — oś W (przekrój na wysokości oczu)</div></div>
+<div id="split"><div style="left:0;top:0"><b>x y z</b> zwykły widok (x, y — podłoga, z — wysokość)</div><div style="left:50%;top:0"><b>w y z</b> zamiast „w prawo” — oś W</div><div style="left:0;top:50%"><b>x w z</b> zamiast „do przodu” — patrzysz wzdłuż W</div><div style="left:50%;top:50%"><b>x y w</b> zamiast wysokości — oś W (poziomy przekrój na wysokości oczu)</div></div>
 <div id="hud"><div class="name" id="hudName"></div><div class="sub" id="hudSub"></div><div class="stats" id="hudStats"></div></div>
 <div id="help"></div>
 <div id="toast"></div>
@@ -141,7 +141,7 @@
   </div>
   <div class="keys">
     ← → ↑ ↓ wybór mapy · Enter graj · W grze: WASD ruch · mysz rozglądanie · LPM strzał · Spacja skok · Shift bieg ·
-    1–7 szybka zmiana mapy · Esc / M menu · P projekcja · [ ] rozdzielczość · kółko FOV · N noclip · V dźwięk · F11 pełny ekran
+    1–9 szybka zmiana mapy · Esc / M menu · P projekcja · [ ] rozdzielczość · kółko: lot (w 4D: krok w W) · Ctrl+kółko FOV · N noclip · V dźwięk · F11 pełny ekran
   </div>
 </div>
 <div id="err"></div>
@@ -159,12 +159,15 @@
 <script src="js/enemies.js"></script>
 <script src="js/worlds/building.js"></script>
 <script src="js/compass4d.js"></script>
+<script src="js/nd4.js"></script>
 <script src="js/worlds/tesseract.js"></script>
 <script src="js/worlds/hyperbolic.js"></script>
 <script src="js/worlds/spherical.js"></script>
 <script src="js/worlds/torus.js"></script>
 <script src="js/worlds/lightspeed.js"></script>
 <script src="js/worlds/loops.js"></script>
+<script src="js/worlds/maze4d.js"></script>
+<script src="js/worlds/islands4d.js"></script>
 <script src="js/menu.js"></script>
 <script src="js/update-check.js"></script>
 <script src="js/main.js"></script>
