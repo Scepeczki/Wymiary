@@ -33,6 +33,12 @@
   .map small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 11px; opacity: .65; margin-top: 3px; line-height: 1.35; }
   #playBtn { width: 92%; margin-top: 6px; padding: 12px; font: inherit; font-size: 16px; font-weight: bold; letter-spacing: 2px; color: #120a20; border: 0; border-radius: 8px;
              background: linear-gradient(90deg,#7df,#f7d); cursor: pointer; }
+  #upd { width: 92%; box-sizing: border-box; padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(140,255,170,.55); background: rgba(80,200,120,.13); font-size: 13px; }
+  #upd[hidden] { display: none; }
+  #upd b { color: #9f9; }
+  #upd small { display: block; opacity: .7; margin: 4px 0 8px; line-height: 1.4; white-space: pre-line; }
+  #updBtn { padding: 7px 14px; font: inherit; font-weight: bold; border: 0; border-radius: 6px; background: #8f9; color: #062; cursor: pointer; }
+  #ver { font-size: 10px; opacity: .4; }
   #menu .keys { font-size: 11px; opacity: .55; line-height: 1.7; margin-top: 8px; }
 
   /* live settings of the current map */
@@ -73,6 +79,7 @@
 <div id="menu">
   <h1>WYMIARY</h1>
   <p class="lead">wybierz mapę <span id="prep"></span></p>
+  <div id="upd" hidden><b></b><small></small><button id="updBtn">⟳ Aktualizuj teraz</button></div>
   <div id="mapList" style="display:flex;flex-direction:column;gap:8px"></div>
   <button id="playBtn">▶ GRAJ</button>
   <div class="keys">
@@ -80,9 +87,11 @@
     1–7 szybki wybór mapy · Esc / M menu · P projekcja · [ ] rozdzielczość<br>
     kółko myszy FOV · N noclip · V dźwięk · F11 pełny ekran
   </div>
+  <div id="ver"></div>
 </div>
 <div id="err"></div>
 
+<script src="js/version.js"></script>
 <script src="js/math.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/glsl.js"></script>
@@ -100,6 +109,7 @@
 <script src="js/worlds/lightspeed.js"></script>
 <script src="js/worlds/loops.js"></script>
 <script src="js/menu.js"></script>
+<script src="js/update-check.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

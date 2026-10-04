@@ -1,0 +1,58 @@
+# Every push to main that changes the game publishes a new release on GitHub (tag v<VERSION>.<n>, e.g. v1.0.7):
+#   Wymiary.zip             - what the installer and the in-game updater download
+#   Wymiary-instalator.exe  - the installer (always installs the newest release)
+# Edit VERSION (e.g. 1.0 -> 1.1) to start a new series. To push without a release put [skip ci] in the commit message.
+# A release can also be made by hand: Actions -> Release -> Run workflow.
+name: Release
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'js/**'
+      - 'assets/**'
+      - 'server/**'
+      - 'launcher/**'
+      - 'installer/**'
+      - 'Zainstaluj.cmd'
+      - 'VERSION'
+      - 'tools/build-release.ps1'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Numer wersji
+        id: v
+        shell: pwsh
+        run: |
+          $base = (Get-Content VERSION -Raw).Trim()
+          $nums = @(git tag -l "v$base.*" | Where-Object { $_ -match "^v$([regex]::Escape($base))\.(\d+)$" } | ForEach-Object { [int]$Matches[1] })
+          $next = if ($nums.Count) { ($nums | Measure-Object -Maximum).Maximum + 1 } else { 0 }
+          $prev = git tag -l 'v*' --sort=-v:refname | Select-Object -First 1
+          $log = if ($prev) { git log "$prev..HEAD" --no-merges --pretty='format:- %s' } else { @('- Pierwsze wydanie') }
+          $notes = @('## Zmiany') + $log + @('', '## Instalacja',
+            'Pobierz **Wymiary-instalator.exe** (niżej, w Assets) i uruchom go. Jeśli Windows ostrzeże, kliknij "Więcej informacji", a potem "Uruchom mimo to".',
+            'Zainstalowana gra sama sprawdza, czy jest nowa wersja, i pozwala ją pobrać.')
+          Set-Content notes.md ($notes -join "`n")
+          "version=$base.$next" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "Wersja: $base.$next (poprzednia: $prev)"
+      - name: Budowanie
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File tools\build-release.ps1 -Version ${{ steps.v.outputs.version }} -Repo ${{ github.repository }}
+      - name: Publikacja
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.v.outputs.version }}" dist/Wymiary.zip dist/Wymiary-instalator.exe `
+            --target $env:GITHUB_SHA --title "Wymiary ${{ steps.v.outputs.version }}" --notes-file notes.md --latest

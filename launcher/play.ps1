@@ -1,8 +1,9 @@
 ﻿# Wymiary — start the game (offline: exploring, bots). Checks GitHub for a newer version first (short timeout, so
 # starting without Internet is not slowed down), then opens the game in a browser app window.
+param([switch]$NoUpdate)
 $ErrorActionPreference = 'SilentlyContinue'
 $app = Split-Path -Parent $PSScriptRoot
-& (Join-Path $PSScriptRoot 'update.ps1') -Ask -Timeout 3
+if (-not $NoUpdate) { & (Join-Path $PSScriptRoot 'update.ps1') -Ask -Timeout 3 }
 $index = Join-Path $app 'index.html'
 $url = 'file:///' + ($index -replace '\\', '/')
 $cands = @(

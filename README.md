@@ -5,18 +5,17 @@ zmienna krzywizna, wolne światło. Gra sieciowa dla dwóch graczy.
 
 ## Instalacja (Windows)
 
-1. Pobierz grę: **[Wymiary-main.zip](https://github.com/Scepeczki/Wymiary/archive/refs/heads/main.zip)**
-   (albo na tej stronie: zielony przycisk **Code** → **Download ZIP**).
-2. Rozpakuj ZIP (prawy przycisk → *Wyodrębnij wszystkie*).
-3. W rozpakowanym folderze uruchom **`Zainstaluj.cmd`**. Jeśli Windows ostrzeże („system Windows ochronił komputer”),
-   kliknij *Więcej informacji* → *Uruchom mimo to*.
-4. Na pulpicie pojawią się skróty. Folder z ZIP-a można potem usunąć.
+1. Pobierz instalator: **[Wymiary-instalator.exe](https://github.com/Scepeczki/Wymiary/releases/latest/download/Wymiary-instalator.exe)**
+   (albo ze strony [Releases](https://github.com/Scepeczki/Wymiary/releases/latest) → *Assets*).
+2. Uruchom go. Jeśli Windows ostrzeże („system Windows ochronił komputer”), kliknij *Więcej informacji* → *Uruchom mimo to*.
+3. Instalator pobierze najnowszą wersję gry z GitHuba, a na pulpicie pojawią się skróty.
 
 Potrzebna jest przeglądarka Chrome, Brave albo Edge. Uprawnienia administratora nie są potrzebne.
 
-**Aktualizacje:** skrót *Wymiary* przy każdym starcie sprawdza, czy na GitHubie jest nowa wersja, i proponuje ją pobrać
-(w menu Start jest też *Wymiary – sprawdź aktualizacje*). *Wymiary – dołącz do gry* dodatkowo wyrównuje wersję z
-serwerem, do którego się łączysz.
+**Aktualizacje:** gra sama sprawdza, czy na GitHubie jest nowsze wydanie. Przy starcie skrótu *Wymiary* pyta, czy je
+pobrać, a w trakcie gry pokazuje w menu ramkę **Nowa wersja… → Aktualizuj teraz** (gra zamknie się, zaktualizuje
+i uruchomi ponownie). W menu Start jest też *Wymiary – sprawdź aktualizacje*. *Wymiary – dołącz do gry* dodatkowo
+wyrównuje wersję z serwerem, do którego się łączysz.
 
 **Gra we dwóch:** jeden gracz uruchamia *Wymiary – gra sieciowa (serwer)* (za pierwszym razem gra sama pobierze
 przenośny Node.js), drugi *Wymiary – dołącz do gry* i wpisuje adres pokazany w oknie serwera. Z innego domu:
@@ -24,9 +23,15 @@ oba komputery w tej samej sieci [Tailscale](https://tailscale.com) → adres `10
 
 ## Wydawanie aktualizacji (dla autora)
 
-Zmiany zatwierdź (commit) i wypchnij (push) na gałąź **main** — np. w GitHub Desktop: *Commit to main* → *Push origin*.
-Gry u innych graczy zobaczą nową wersję przy następnym uruchomieniu. Instalatory .exe (opcjonalnie):
-`powershell -ExecutionPolicy Bypass -File tools\build-installer.ps1`.
+Wystarczy zatwierdzić zmiany i wypchnąć je na gałąź **main** — w GitHub Desktop: *Commit to main* → *Push origin*.
+GitHub Actions (`.github/workflows/release.yml`) samo zbuduje i opublikuje nowe wydanie **v1.0.N** z plikami
+`Wymiary.zip` (pobierają go instalator i aktualizator) i `Wymiary-instalator.exe`; opis wydania to lista commitów.
+Postęp widać w zakładce **Actions** repozytorium, gotowe wydania w **Releases**.
+
+- Wydanie powstaje tylko wtedy, gdy zmieniły się pliki gry (nie np. samo README). Push bez wydania: dopisz `[skip ci]` do opisu commita.
+- Nowa seria numerów: zmień plik `VERSION` (np. `1.0` → `1.1`).
+- Wydanie ręcznie: *Actions → Release → Run workflow*. Lokalny test budowania:
+  `powershell -ExecutionPolicy Bypass -File tools\build-release.ps1 -Version 1.0.99` → folder `dist\`.
 
 ---
 

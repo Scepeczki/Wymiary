@@ -8,6 +8,7 @@ $desk = [Environment]::GetFolderPath('Desktop')
 Get-ChildItem $desk -Filter 'Wymiary*.lnk' -ErrorAction SilentlyContinue | Remove-Item -Force
 Remove-Item -Recurse -Force (Join-Path ([Environment]::GetFolderPath('Programs')) 'Wymiary') -ErrorAction SilentlyContinue
 Remove-Item -Force 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Wymiary' -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force 'HKCU:\Software\Classes\wymiary' -ErrorAction SilentlyContinue
 # the folder cannot delete itself while this script runs from it: remove it right after we exit
 Start-Process cmd -ArgumentList "/c timeout /t 2 >nul & rmdir /s /q `"$app`"" -WindowStyle Hidden
 [System.Windows.Forms.MessageBox]::Show('Wymiary zostały odinstalowane.', 'Wymiary') | Out-Null
