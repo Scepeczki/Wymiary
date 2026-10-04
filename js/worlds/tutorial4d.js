@@ -232,6 +232,7 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
     aim() { return this.player.aim(); },
     reverb: 0.05,
     soundArrivals(src) { return W4D.soundArrivals(this, src); },
+    lesson: 0, step: 0,
     settings: [{ label: 'Lekcja', min: 1, max: L.length, step: 1, reset: 1, get: () => world.lesson + 1, set: v => world.setLesson(Math.round(v) - 1), text: () => `${world.lesson + 1}. ${L[world.lesson].title}` }],
     enter() {
       if (!this.player) {
@@ -247,6 +248,7 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
     goto(p, yaw) { this.player.reset(p, yaw); this.snap = null; this.anaQueue = 0; },
     setLesson(i) {
       this.lesson = WM.clamp(i, 0, L.length - 1);
+      if (!this.player) return;                 // chosen in the menu before the map was entered: applied on enter
       this.step = 0; this.doneT = -1; this.minW = 1e9; this.maxW = -1e9; this.wTravel = 0; this.gatePassed = false;
       if (L[this.lesson].start) L[this.lesson].start(this);
       else if (this.lesson === 0) this.goto([-3, EYE, -5, 0], 0);
