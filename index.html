@@ -6,7 +6,7 @@
 <link rel="icon" href="assets/icon.png">
 <style>
   html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: Consolas, "Segoe UI", monospace; color: #e8f0ff; }
-  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  #c { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
   #fade { position: fixed; inset: 0; background: #000; opacity: 1; pointer-events: none; transition: opacity .35s; display: flex; align-items: center; justify-content: center; font-size: 16px; color: #9ab; letter-spacing: 1px; }
   #hud { position: fixed; left: 16px; top: 12px; pointer-events: none; text-shadow: 0 1px 3px #000, 0 0 8px #000; transition: opacity .2s; }
   #hud .name { font-size: 22px; font-weight: bold; letter-spacing: 1px; }
@@ -15,6 +15,9 @@
   #help { position: fixed; right: 16px; top: 12px; font-size: 12px; line-height: 1.5; text-align: right; pointer-events: none; opacity: .8; white-space: pre; text-shadow: 0 1px 3px #000; transition: opacity .2s; }
   #cross { position: fixed; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255,255,255,.8); box-shadow: 0 0 4px #000; pointer-events: none; }
   #toast { position: fixed; left: 50%; bottom: 22%; transform: translateX(-50%); font-size: 18px; padding: 8px 18px; background: rgba(0,0,0,.55); border-radius: 6px; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  #split { position: fixed; inset: 0; pointer-events: none; display: none; }
+  #split div { position: absolute; width: 50%; height: 50%; box-sizing: border-box; border: 1px solid rgba(255,255,255,.35); padding: 6px 10px; font-size: 12px; text-align: center; text-shadow: 0 1px 3px #000; }
+  #split b { color: #fd7; font-size: 14px; margin-right: 6px; letter-spacing: 2px; }
   #hurt { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, rgba(255,0,0,0) 40%, rgba(255,0,0,.55)); }
 
   /* main menu: full screen over the still-rendering world; map cards on the left, the selected map on the right */
@@ -107,6 +110,7 @@
 <body>
 <canvas id="c"></canvas>
 <div id="cross"></div>
+<div id="split"><div style="left:0;top:0"><b>x y z</b> zwykły widok</div><div style="left:50%;top:0"><b>w y z</b> zamiast „w prawo” — oś W</div><div style="left:0;top:50%"><b>x y w</b> patrzysz w stronę W</div><div style="left:50%;top:50%"><b>x w z</b> zamiast pionu — oś W (przekrój na wysokości oczu)</div></div>
 <div id="hud"><div class="name" id="hudName"></div><div class="sub" id="hudSub"></div><div class="stats" id="hudStats"></div></div>
 <div id="help"></div>
 <div id="toast"></div>

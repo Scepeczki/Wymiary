@@ -15,6 +15,7 @@ uniform int uProj;
 // once per loop instead of once per iteration — this keeps compile times of big maps short.
 uniform int uZero;
 uniform float uFov;
+uniform vec2 uViewOff;   // split screen: lower-left corner of this view in window pixels (uRes = its size)
 uniform vec4 uBullets[${G.MAX_BULLETS}];
 uniform float uBulletR[${G.MAX_BULLETS}];
 uniform int uBulletN;
@@ -294,7 +295,7 @@ float shadow(vec3 p, vec3 l){
 }
 void main(){
   vec3 lo, ld;
-  if (!camRay(gl_FragCoord.xy, lo, ld)) { fragColor = vec4(0,0,0,1); return; }
+  if (!camRay(gl_FragCoord.xy - uViewOff, lo, ld)) { fragColor = vec4(0,0,0,1); return; }
   vec3 p = uCamPos + uCamRot*lo, rd = uCamRot*ld;
 #ifdef RELATIVITY
   rd = aberrate(rd);
@@ -387,7 +388,7 @@ void main(){
   col = dopplerShift(col, Dop);
 #endif
   col = applyGun(col, lo, ld);
-  fragColor = vec4(post(col, gl_FragCoord.xy), 1);
+  fragColor = vec4(post(col, gl_FragCoord.xy - uViewOff), 1);
 }`;
     return { render, probe: asProbe(common) + probeMain('map(q.xyz).x') };
   };
@@ -442,7 +443,7 @@ float shadow(vec4 p, vec4 l){
 }
 void main(){
   vec3 lo, ld;
-  if (!camRay(gl_FragCoord.xy, lo, ld)) { fragColor = vec4(0,0,0,1); return; }
+  if (!camRay(gl_FragCoord.xy - uViewOff, lo, ld)) { fragColor = vec4(0,0,0,1); return; }
   vec4 ro = uPos + uBasis*lo;
   vec4 rd = uBasis*ld;
   float t = 0.; vec2 h = vec2(1e9,-1.); bool hit = false, inside = true;
@@ -477,7 +478,7 @@ void main(){
   }
   col += BULLET_COL*exp(-max(bmin, 0.)*.6)*1.2 + ENEMY_COL*exp(-max(emin, 0.)*1.5)*.9;
   col = applyGun(col, lo, ld);
-  fragColor = vec4(post(col, gl_FragCoord.xy), 1);
+  fragColor = vec4(post(col, gl_FragCoord.xy - uViewOff), 1);
 }`;
     return { render, probe: asProbe(common) + probeMain('map(q).x') };
   };
@@ -540,7 +541,7 @@ float calcAO(vec4 p, vec4 n){
 }
 void main(){
   vec3 lo, ld;
-  if (!camRay(gl_FragCoord.xy, lo, ld)) { fragColor = vec4(0,0,0,1); return; }
+  if (!camRay(gl_FragCoord.xy - uViewOff, lo, ld)) { fragColor = vec4(0,0,0,1); return; }
   vec4 ro = uCam[3];
   vec4 rd = uCam*vec4(ld, 0.);
   float ol = length(lo);
@@ -581,7 +582,7 @@ void main(){
   }
   col += BULLET_COL*exp(-max(bmin, 0.)*.6)*1.2 + ENEMY_COL*exp(-max(emin, 0.)*1.5)*.9;
   col = applyGun(col, lo, ld);
-  fragColor = vec4(post(col, gl_FragCoord.xy), 1);
+  fragColor = vec4(post(col, gl_FragCoord.xy - uViewOff), 1);
 }`;
     return { render, probe: asProbe(common) + probeMain('map(q).x') };
   };

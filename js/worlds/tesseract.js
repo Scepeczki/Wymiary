@@ -98,7 +98,7 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
     name: 'Tesserakt 4D',
     subtitle: 'Czterowymiarowy świat (x, y, z, w). Widzisz trójwymiarowy przekrój. Jesteś zamknięty w pokoju — ale ściany mają grubość tylko w osi W. Wyjdź przez czwarty wymiar.',
     tags: ['4D', 'potwory z osi W', 'kompas 4D'],
-    help: ['pociski lecą w 4D: po obrocie w W znikają z przekroju', 'T / G — krok w osi W (ana / kata)', 'Q / E — obrót widoku w płaszczyźnie przód–W', 'Z / C — obrót w płaszczyźnie prawo–W', 'X — wyzeruj obrót 4D', 'walka: czerwone kropki na kompasie = potwory (mogą być obok w osi W!)', 'kompas 4D w rogu · B — widok stały / za tobą', 'kolor = współrzędna W'],
+    help: ['pociski lecą w 4D: po obrocie w W znikają z przekroju', 'T / G — krok w osi W (ana / kata)', 'Q / E — obrót widoku w płaszczyźnie przód–W', 'Z / C — obrót w płaszczyźnie prawo–W', 'X — wyzeruj obrót 4D', 'walka: czerwone kropki na kompasie = potwory (mogą być obok w osi W!)', 'kompas 4D w rogu · B — widok stały / za tobą', 'kolor = współrzędna W', 'F — cztery widoki: przekroje (x y z), (w y z), (x y w), (x w z)', 'kółko myszy — lot w górę / w dół'],
     shader: () => WG.nd(code),
     bullets: new WBullets(WBallistics.flat(4, { speed: 55, gravity: 1.2, life: 4 }), { hitTest: q => swarm.hitTest(q) || WMP.hitPeers(q) }),
     aim() { return this.player.aim(); },
@@ -121,7 +121,11 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
       WSwarm.startMode(this, swarm, opts);
       if (!this._gKey) {
         this._gKey = true;
-        window.addEventListener('keydown', e => { if (e.code === 'KeyB' && !e.repeat && WE.world === world) compass.follow = !compass.follow; });
+        window.addEventListener('keydown', e => {
+          if (e.repeat || WE.world !== world || !WE.locked) return;
+          if (e.code === 'KeyB') compass.follow = !compass.follow;
+          if (e.code === 'KeyF') { world.split = !world.split; WE.toast(world.split ? 'Cztery widoki: (x y z) · (w y z) · (x y w) · (x w z)' : 'Jeden widok'); }
+        });
       }
     },
     update(dt, look) {
@@ -153,7 +157,28 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
       return { eye: p, body: [p, dn(0.8), dn(1.3)] };
     },
     setUniforms(gl, prog) { this.player.setUniformsND(gl, prog); swarm.setUniforms(gl, prog); },
+    // F: four views of the same moment, each a 3D slice through a different triple of your axes
+    // (x = your right, y = up, z = forward, w = ana — the hidden 4th direction):
+    //   (x y z) the normal view │ (w y z) right replaced by W
+    //   (x y w) looking into W  │ (x w z) up replaced by W: a horizontal 3D slice at eye height
+    split: false,
+    splitView() { return this.split; },
+    drawViews(gl, prog, cw, ch) {
+      if (!this.split) return false;
+      const hw = Math.floor(cw / 2), hh = Math.floor(ch / 2), c = this.player.camera(), A = this.player.frame[2];
+      const views = [[0, hh, c.right, c.up, c.fwd], [hw, hh, A, c.up, c.fwd], [0, 0, c.right, c.up, A], [hw, 0, c.right, A, c.fwd]];
+      views.forEach(([x, y, r, u, f], i) => {
+        gl.viewport(x, y, hw, hh);
+        gl.uniform2f(prog.u('uRes'), hw, hh);
+        gl.uniform2f(prog.u('uViewOff'), x, y);
+        gl.uniformMatrix3x4fv(prog.u('uBasis'), false, new Float32Array([...r, ...u, ...f]));
+        if (i === 1) gl.uniform1f(prog.u('uGunShow'), 0);    // the pistol only in the normal view
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      });
+      return true;
+    },
     setBulletUniforms(gl, p) { WBullets.uploadSigned(gl, p, [[this.bullets, false], [swarm.shots, true], ...WMP.extraBullets(this)]); },
+    settings: [{ label: 'Cztery widoki (F)', type: 'toggle', get: () => world.split, set: v => { world.split = v; } }],
     drawOverlay(ctx, W, H, dt) {
       // monsters on the compass: red dots (you see only those that lie in your 3D slice)
       compass.extra = swarm.list.filter(m => m.dead < 0).map(m => ({ label: '', color: '#ff4b4b', at: [m.g.p[0], m.g.p[2], m.g.p[3]], r: 0.45, fill: true }))

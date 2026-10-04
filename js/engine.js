@@ -9,6 +9,9 @@
   E.MAX_PROBES = 64;
 
   E.register = w => E.worlds.push(w);
+  // mouse wheel notches waiting for the player controller (flying up / down)
+  E.flyImpulse = 0;
+  E.takeFly = () => { const f = E.flyImpulse; E.flyImpulse = 0; return f; };
 
   function showError(msg) {
     const el = document.getElementById('err');
@@ -208,10 +211,14 @@
     document.addEventListener('mousedown', e => { if (E.locked && e.button === 0) E.fireHeld = true; });
     document.addEventListener('mouseup', e => { if (e.button === 0) E.fireHeld = false; });
     document.addEventListener('mousemove', e => { if (E.locked) { E.mouseDX += e.movementX; E.mouseDY += e.movementY; } });
+    // mouse wheel: fly up / down (the player hovers until it lands again); Ctrl + wheel: field of view
     c.addEventListener('wheel', e => {
-      E.fov = WM.clamp(E.fov * (e.deltaY > 0 ? 1.08 : 1 / 1.08), 0.3, 2.9);
-      E.toast('FOV ' + Math.round(E.fov * 180 / Math.PI) + '°', 700);
-    });
+      e.preventDefault();
+      if (e.ctrlKey) {
+        E.fov = WM.clamp(E.fov * (e.deltaY > 0 ? 1.08 : 1 / 1.08), 0.3, 2.9);
+        E.toast('FOV ' + Math.round(E.fov * 180 / Math.PI) + '°', 700);
+      } else if (E.locked && e.deltaY) E.flyImpulse += e.deltaY < 0 ? 1 : -1;
+    }, { passive: false });
     window.addEventListener('keydown', e => {
       if (e.code === 'Tab' || e.code === 'Space') e.preventDefault();
       if (!E.locked) return;   // menu open: the menu handles the keys
@@ -270,12 +277,14 @@
       gl.uniform1f(w.prog.u('uTime'), E.time);
       gl.uniform1i(w.prog.u('uProj'), E.projMode);
       gl.uniform1f(w.prog.u('uFov'), E.fov);
+      gl.uniform2f(w.prog.u('uViewOff'), 0, 0);
       w.setUniforms(gl, w.prog);
       WGun.setUniforms(gl, w.prog, !!w.bullets && !WMP.dead());
       if (w.setBulletUniforms) w.setBulletUniforms(gl, w.prog);
       else if (w.bullets) w.bullets.setUniforms(gl, w.prog); else gl.uniform1i(w.prog.u('uBulletN'), 0);
       gl.bindVertexArray(E.vao);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      if (w.drawViews && w.drawViews(gl, w.prog, cw, ch)) gl.viewport(0, 0, cw, ch);   // split screen (4D)
+      else gl.drawArrays(gl.TRIANGLES, 0, 3);
       if (E.afterDraw) E.afterDraw();
 
       // optional 2D overlay of the world (e.g. the 4D compass)

@@ -22,7 +22,7 @@
       const horiz = [0, 2, 3, 4].filter(a => a < n);
       this.frame = horiz.map(a => { const v = WM.vec(n); v[a] = 1; return v; });
       WM.rotFrame(this.frame, 1, 0, yaw); // yaw: forward towards right
-      this.grounded = false;
+      this.grounded = false; this.flying = false;
     }
     get right() { return this.frame[0]; }
     get forward() { return this.frame[1]; }
@@ -72,12 +72,17 @@
         return;
       }
 
+      // mouse wheel: fly up / down — while flying there is no gravity, the vertical speed dies out (you hover)
+      // and you land as soon as you touch the floor again
+      const fi = WM.clamp(E.takeFly ? E.takeFly() : 0, -3, 3);
+      if (fi) { this.flying = true; this.vel[1] = WM.clamp(this.vel[1] + fi * 2.5, -9, 9); }
       // horizontal velocity towards wish
-      const accel = this.grounded ? 14 : 3;
+      const accel = this.grounded || this.flying ? 14 : 3;
       const k = 1 - Math.exp(-accel * dt);
       for (let i = 0; i < n; i++) if (i !== 1) this.vel[i] += (wish[i] * speed - this.vel[i]) * k;
-      this.vel[1] -= o.gravity * dt;
-      if (this.grounded && E.keys.Space) { this.vel[1] = o.jump; this.grounded = false; }
+      if (this.flying) this.vel[1] *= Math.exp(-dt * 1.2);
+      else this.vel[1] -= o.gravity * dt;
+      if (this.grounded && E.keys.Space) { this.vel[1] = o.jump; this.grounded = false; this.flying = false; }
 
       // integrate with substeps
       this.prev = this.pos.slice();
@@ -89,6 +94,7 @@
         if (this.onStep) this.onStep(before, this.pos);
         this.collide();
       }
+      if (this.flying && this.grounded && this.vel[1] <= 0.5) this.flying = false;   // landed
       if (this.pos[1] < o.respawnY) { this.reset(o.spawn || [0, EYE, 0]); E.toast('Respawn'); }
     }
 
@@ -174,7 +180,7 @@
     }
     reset() {
       this.M = WM.ident(4);
-      this.h = this.opts.eye; this.vh = 0; this.pitch = 0;
+      this.h = this.opts.eye; this.vh = 0; this.pitch = 0; this.flying = false;
     }
     // point at local (horizontal x, height, horizontal z) relative to the player's feet
     local(x, y, z) {
@@ -204,11 +210,17 @@
 
       if (this.noclip) this.h = Math.max(0.02, this.h + E.axis('ControlLeft', 'Space') * sp);
       else {
+        // mouse wheel: fly up / down (hover, land on the floor) — speeds in metres scaled to this world's units
+        const unit = o.eye / 1.6, fi = WM.clamp(E.takeFly ? E.takeFly() : 0, -3, 3);
+        if (fi) { this.flying = true; this.vh = WM.clamp(this.vh + fi * 2.5 * unit, -9 * unit, 9 * unit); }
         const ground = this.h <= o.eye + 1e-4;
-        if (ground && E.keys.Space) this.vh = o.jump;
-        this.vh -= o.gravity * dt;
+        if (ground && E.keys.Space) { this.vh = o.jump; this.flying = false; }
+        if (this.flying) this.vh *= Math.exp(-dt * 1.2);
+        else this.vh -= o.gravity * dt;
         this.h += this.vh * dt;
-        if (this.h < o.eye) { this.h = o.eye; this.vh = 0; }
+        const top = K > 0 ? 1.3 : 2.5;
+        if (this.h > top) { this.h = top; this.vh = Math.min(this.vh, 0); }
+        if (this.h < o.eye) { this.h = o.eye; this.vh = 0; this.flying = false; }
         this.collide();
       }
       if (this.onMoved) this.onMoved();

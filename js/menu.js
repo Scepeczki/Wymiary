@@ -168,7 +168,7 @@
   M.show = function (open) {
     M.open = open;
     $('menu').classList.toggle('open', open);
-    for (const id of ['hud', 'cross', 'wset', 'duel', 'health', 'mini', 'ammo']) { const e = $(id); if (e) e.style.visibility = open ? 'hidden' : ''; }
+    for (const id of ['hud', 'cross', 'wset', 'duel', 'health', 'mini', 'ammo', 'split']) { const e = $(id); if (e) e.style.visibility = open ? 'hidden' : ''; }
     $('help').style.opacity = open ? 0 : 0.8;
     if (open) select(WE.worldIndex >= 0 ? WE.worldIndex : M.sel);
   };
@@ -206,6 +206,10 @@
       hb.style.display = w && w.health != null ? 'block' : 'none';
       if (w && w.health != null) hb.firstChild.style.width = Math.max(0, w.health) + '%';
       if (M.open) { markCards(); updatePlayLabel(); showPeers(); followFirstPeer(); }
+      // split screen (4D): labels, and the crosshair in the middle of the normal view
+      const split = !!(w && w.splitView && w.splitView());
+      $('split').style.display = split ? 'block' : 'none';
+      $('cross').style.left = split ? '25%' : ''; $('cross').style.top = split ? '25%' : '';
       const net = WMP.status();
       if ($('net').textContent !== net) $('net').textContent = net;
       // ammo

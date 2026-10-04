@@ -52,8 +52,10 @@ Postęp widać w zakładce **Actions** repozytorium, gotowe wydania w **Releases
 | R | przeładowanie (animacja: broń unosi się, stary magazynek wypada, nowy wchodzi; pusty magazynek przeładowuje sam) |
 | Esc / M | menu wyboru map (świat renderuje się obok, na dole suwaki mapy) · **1–7** szybki wybór |
 | P | tryb projekcji: perspektywa, rybie oko 360°, panorama, perspektywa odwrócona, ortogonalna |
-| kółko myszy | FOV · **[ ]** rozdzielczość renderu · **N** noclip · **V** dźwięk wł./wył. |
+| kółko myszy | **lot** w górę / w dół: unosisz się w powietrzu, dopóki znów nie staniesz na podłodze (każda mapa) |
+| Ctrl + kółko | FOV · **[ ]** rozdzielczość renderu · **N** noclip · **V** dźwięk wł./wył. |
 | 4D: T/G, Q/E, Z/C, X, B | krok w W (ana / kata), obrót przód↔W, obrót prawo↔W, reset obrotu, kompas 4D: widok stały / za tobą |
+| 4D: F | **cztery widoki** naraz — przekroje przez różne trójki twoich osi (x = w prawo, y = w górę, z = przód, w = ana): (x y z) zwykły, (w y z) zamiast „w prawo” oś W, (x y w) patrzysz w stronę W, (x w z) zamiast pionu oś W (poziomy przekrój 3D na wysokości oczu) |
 | Korytarze K: Q/E, X | K całej mapy, płasko (to samo suwakiem w menu); tryb z potworami wybierasz na karcie mapy |
 | Wolne światło: Q/E, L, F, B/J/K | prędkość światła, wszystkie lampy, lampa na celowniku, aberracja / Doppler / opóźnienie światła |
 
