@@ -72,6 +72,19 @@
       done.push(i);
     }
   };
+  // Inverse of an n x n matrix given as columns (Gauss-Jordan with partial pivoting).
+  M.inverse = a => {
+    const n = a.length, r = Array.from({ length: n }, (_, i) => [...a.map(c => c[i]), ...M.ident(n)[i]]);   // rows [A | I]
+    for (let c = 0; c < n; c++) {
+      let p = c;
+      for (let i = c + 1; i < n; i++) if (Math.abs(r[i][c]) > Math.abs(r[p][c])) p = i;
+      [r[c], r[p]] = [r[p], r[c]];
+      const d = r[c][c];
+      for (let j = 0; j < 2 * n; j++) r[c][j] /= d;
+      for (let i = 0; i < n; i++) if (i !== c) { const f = r[i][c]; for (let j = 0; j < 2 * n; j++) r[i][j] -= f * r[c][j]; }
+    }
+    return Array.from({ length: n }, (_, c) => r.map(row => row[n + c]));
+  };
   // Flatten a 4x4 column matrix for gl.uniformMatrix4fv.
   M.flat = m => new Float32Array(m.flat());
 

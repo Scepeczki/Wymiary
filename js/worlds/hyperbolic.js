@@ -63,7 +63,7 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
     tags: ['K = −1', 'H³', 'potwory'],
     help: ['WASD ruch · Spacja skok', 'pociski lecą po geodezyjnych H³ — rozbiegają się wykładniczo', 'policz sześciany wokół narożnika podłogi (5!)', 'walka: ich fioletowe pociski też lecą po geodezyjnych', 'N noclip (Spacja/Ctrl — wysokość)'],
     shader: () => WG.curved(K, code, '#define MAX_T 7.\n#define FOG_DENS .42\n'),
-    bullets: new WBullets(WBallistics.curved(K, { speed: 1.4, gravity: 0.35, radius: 0.007 }), { hitTest: q => swarm.hitTest(q) }),
+    bullets: new WBullets(WBallistics.curved(K, { speed: 4.5, gravity: 0.1, radius: 0.007, life: 3 }), { hitTest: q => swarm.hitTest(q) || WMP.hitPeers(q) }),
     aim() { return this.player.aim(); },
     reverb: 0.05,
     soundArrivals(src) { return WAudio.curvedArrivals(K, 1.6 / 0.17, src, this.player.camera()); },
@@ -84,6 +84,9 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
                 return r;
               };
               p.M = p.M.map(f);
+              // the shared (network) coordinates: local = T · absolute
+              const F = [0, 1, 2, 3].map(i => f([0, 1, 2, 3].map(j => (i === j ? 1 : 0))));
+              T = WM.mulMat(F, T); Tinv = WM.inverse(T);
               this.bullets.transform(f);   // bullets live in the same coordinates: move them along
               swarm.shots.transform(f);
               for (const m of swarm.list) swarm.sp.transform(m.g, f);
@@ -98,7 +101,7 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
     },
     update(dt, look) { this.player.update(dt, look); swarm.update(dt); },
     setUniforms(gl, prog) { this.player.setUniforms(gl, prog); swarm.setUniforms(gl, prog); },
-    setBulletUniforms(gl, p) { WBullets.uploadSigned(gl, p, [[this.bullets, false], [swarm.shots, true]]); },
+    setBulletUniforms(gl, p) { WBullets.uploadSigned(gl, p, [[this.bullets, false], [swarm.shots, true], ...WMP.extraBullets(this)]); },
     // monsters appear on the floor plane around you, facing you
     spawn(i, wave) {
       const r = 1.1 + Math.random() * 0.7;
@@ -117,5 +120,15 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
   const swarm = new WSwarm(world, WSwarm.spaces.curved(K, EN_M), {
     range: 22, shotModel: WBallistics.curved(K, { speed: 9 * EN_M, gravity: 0, radius: 0.012, life: 6 }),
   });
+  // multiplayer: the world keeps re-centring itself on you (above), so positions are sent in shared coordinates
+  // absolute = T⁻¹ · local, where T collects all the re-centring maps applied so far
+  let T = WM.ident(4), Tinv = WM.ident(4);
+  world.mp = {
+    space: swarm.sp,
+    me: () => ({ M: world.player.M.map(c => c.slice()) }),
+    respawn() { world.player.reset(); world.player.move((Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3); },
+    toAbs: v => WM.mulVec(Tinv, v),
+    toLocal: v => WM.mulVec(T, v),
+  };
   WE.register(world);
 })();

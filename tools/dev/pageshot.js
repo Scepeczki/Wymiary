@@ -23,7 +23,7 @@ setTimeout(async () => {
     ws.onmessage = e => { const m = JSON.parse(e.data); if (wait4[m.id]) wait4[m.id](m); };
     const send = (method, params = {}) => new Promise(r => { wait4[++id] = r; ws.send(JSON.stringify({ id, method, params })); });
     await new Promise(r => { ws.onopen = r; });
-    if (js) { const r = await send('Runtime.evaluate', { expression: js, awaitPromise: true, returnByValue: true }); if (r.result && r.result.exceptionDetails) console.log('JS:', JSON.stringify(r.result.exceptionDetails)); else if (r.result && r.result.result.value !== undefined) console.log('JS =>', JSON.stringify(r.result.result.value)); await new Promise(r => setTimeout(r, 1500)); }
+    if (js) { const r = await send('Runtime.evaluate', { expression: js, awaitPromise: true, returnByValue: true }); if (r.result && r.result.exceptionDetails) console.log('JS:', JSON.stringify(r.result.exceptionDetails)); else if (r.result && r.result.result.value !== undefined) console.log('JS =>', JSON.stringify(r.result.result.value)); await new Promise(r => setTimeout(r, +(process.env.PS_AFTER || 1500))); }
     const err = await send('Runtime.evaluate', { expression: "document.getElementById('err').textContent" });
     if (err.result.result.value) console.log('BŁĄD na stronie:', err.result.result.value.slice(0, 1500));
     const shot = await send('Page.captureScreenshot', { format: 'png' });

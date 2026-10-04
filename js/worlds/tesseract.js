@@ -98,9 +98,9 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
     name: 'Tesserakt 4D',
     subtitle: 'Czterowymiarowy świat (x, y, z, w). Widzisz trójwymiarowy przekrój. Jesteś zamknięty w pokoju — ale ściany mają grubość tylko w osi W. Wyjdź przez czwarty wymiar.',
     tags: ['4D', 'potwory z osi W', 'kompas 4D'],
-    help: ['pociski lecą w 4D: po obrocie w W znikają z przekroju', 'R / F — krok w osi W (ana / kata)', 'Q / E — obrót widoku w płaszczyźnie przód–W', 'Z / C — obrót w płaszczyźnie prawo–W', 'X — wyzeruj obrót 4D', 'walka: czerwone kropki na kompasie = potwory (mogą być obok w osi W!)', 'kompas 4D w rogu · G — widok stały / za tobą', 'kolor = współrzędna W'],
+    help: ['pociski lecą w 4D: po obrocie w W znikają z przekroju', 'T / G — krok w osi W (ana / kata)', 'Q / E — obrót widoku w płaszczyźnie przód–W', 'Z / C — obrót w płaszczyźnie prawo–W', 'X — wyzeruj obrót 4D', 'walka: czerwone kropki na kompasie = potwory (mogą być obok w osi W!)', 'kompas 4D w rogu · B — widok stały / za tobą', 'kolor = współrzędna W'],
     shader: () => WG.nd(code),
-    bullets: new WBullets(WBallistics.flat(4, { speed: 28 }), { hitTest: q => swarm.hitTest(q) }),
+    bullets: new WBullets(WBallistics.flat(4, { speed: 55, gravity: 1.2, life: 4 }), { hitTest: q => swarm.hitTest(q) || WMP.hitPeers(q) }),
     aim() { return this.player.aim(); },
     reverb: 0.08,
     // 4D: amplitude ~ 1/r^1.5 and a Huygens-violating tail behind every wavefront; sound coming mostly
@@ -121,7 +121,7 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
       WSwarm.startMode(this, swarm, opts);
       if (!this._gKey) {
         this._gKey = true;
-        window.addEventListener('keydown', e => { if (e.code === 'KeyG' && !e.repeat && WE.world === world) compass.follow = !compass.follow; });
+        window.addEventListener('keydown', e => { if (e.code === 'KeyB' && !e.repeat && WE.world === world) compass.follow = !compass.follow; });
       }
     },
     update(dt, look) {
@@ -136,7 +136,7 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
       }
       p.update(dt, look, {
         rot: [[1, 2, 'KeyQ', 'KeyE'], [0, 2, 'KeyZ', 'KeyC']],
-        moves: [[2, 'KeyF', 'KeyR']],
+        moves: [[2, 'KeyG', 'KeyT']],
       });
     },
     // monsters appear 11-17 m away in a random horizontal direction of the 3D space (x, z, w)
@@ -153,10 +153,11 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
       return { eye: p, body: [p, dn(0.8), dn(1.3)] };
     },
     setUniforms(gl, prog) { this.player.setUniformsND(gl, prog); swarm.setUniforms(gl, prog); },
-    setBulletUniforms(gl, p) { WBullets.uploadSigned(gl, p, [[this.bullets, false], [swarm.shots, true]]); },
+    setBulletUniforms(gl, p) { WBullets.uploadSigned(gl, p, [[this.bullets, false], [swarm.shots, true], ...WMP.extraBullets(this)]); },
     drawOverlay(ctx, W, H, dt) {
       // monsters on the compass: red dots (you see only those that lie in your 3D slice)
-      compass.extra = swarm.list.filter(m => m.dead < 0).map(m => ({ label: '', color: '#ff4b4b', at: [m.g.p[0], m.g.p[2], m.g.p[3]], r: 0.45, fill: true }));
+      compass.extra = swarm.list.filter(m => m.dead < 0).map(m => ({ label: '', color: '#ff4b4b', at: [m.g.p[0], m.g.p[2], m.g.p[3]], r: 0.45, fill: true }))
+        .concat(WMP.avatars(this).filter(a => a.alive).map(a => ({ label: 'gracz ' + a.id, color: '#6cf', at: [a.g.p[0], a.g.p[2], a.g.p[3]], r: 0.5, fill: true })));
       compass.draw(ctx, W, H, dt, this.player);
     },
     stats() {
@@ -168,5 +169,11 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
   const swarm = new WSwarm(world, WSwarm.spaces.flat4(), {
     range: 28, shotModel: WBallistics.flat(4, { speed: 10, gravity: 0, life: 5, radius: 0.09 }),
   });
+  // multiplayer: you are a 4D figure (feet + your horizontal frame right / forward / ana)
+  world.mp = {
+    space: swarm.sp,
+    me() { const p = world.player.pos, fr = world.player.frame; return { p: [p[0], p[1] - WPlayer.EYE, p[2], p[3]], R: fr[0], F: fr[1], A: fr[2] }; },
+    respawn() { const r = (a) => (Math.random() - 0.5) * a; world.player.reset([r(5), WPlayer.EYE, r(5), r(0.8)]); },
+  };
   WE.register(world);
 })();

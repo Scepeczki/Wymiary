@@ -36,6 +36,12 @@
   .card .num { position: absolute; left: 8px; top: 8px; width: 26px; height: 26px; border-radius: 6px; background: rgba(0,0,0,.6); display: grid; place-items: center; font-weight: bold; font-size: 14px; }
   .card .now { position: absolute; right: 8px; top: 8px; font-size: 10px; letter-spacing: 1px; padding: 3px 7px; border-radius: 5px; background: #fd7; color: #210; font-weight: bold; display: none; }
   .card.cur .now { display: block; }
+  .card .pp { position: absolute; left: 40px; top: 8px; font-size: 11px; padding: 3px 8px; border-radius: 5px; background: rgba(60,170,255,.85); color: #fff; font-weight: bold; display: none; }
+  #net { font-size: 12px; color: #8cf; }
+  #dPeers:empty { display: none; }
+  #dPeers { display: flex; flex-direction: column; gap: 6px; }
+  .peerRow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; background: rgba(60,170,255,.12); border: 1px solid rgba(60,170,255,.35); font-size: 13px; }
+  .peerRow button { margin-left: auto; padding: 5px 10px; border: 0; border-radius: 6px; background: #5af; color: #012; font: inherit; font-weight: bold; cursor: pointer; }
   .card .ctxt { padding: 9px 12px 11px; }
   .card b { display: block; font-size: 16px; margin-bottom: 5px; }
   .tags { display: flex; gap: 5px; flex-wrap: wrap; }
@@ -89,7 +95,12 @@
   #duel .score { font-size: 22px; font-weight: bold; letter-spacing: 2px; }
   #duel .bar { width: 240px; height: 8px; margin: 4px auto; border-radius: 4px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.3); overflow: hidden; }
   #duel .bar div { height: 100%; background: linear-gradient(90deg,#c22,#f64); }
-  #ammo { position: fixed; left: 250px; bottom: 11px; font-size: 16px; text-shadow: 0 1px 3px #000; pointer-events: none; }
+  #ammo { position: fixed; left: 250px; bottom: 8px; font-size: 17px; font-weight: bold; text-shadow: 0 1px 3px #000; pointer-events: none; display: none; }
+  #ammo .n small { font-size: 12px; font-weight: normal; opacity: .7; }
+  #ammo.empty .n { color: #f86; }
+  #ammo .rl { width: 120px; height: 5px; margin-top: 3px; border-radius: 3px; background: rgba(0,0,0,.5); overflow: hidden; display: none; }
+  #ammo.reloading .rl { display: block; }
+  #ammo .rl div { height: 100%; width: 0; background: #fd7; }
   #err { position: fixed; inset: 0; background: #200; color: #fbb; padding: 20px; white-space: pre-wrap; font-size: 12px; overflow: auto; display: none; }
 </style>
 </head>
@@ -103,10 +114,11 @@
 <div id="wset"></div>
 <div id="duel"></div>
 <div id="health"><div></div></div>
+<div id="ammo"><span class="n"></span><div class="rl"><div></div></div></div>
 <canvas id="mini" width="300" height="300"></canvas>
 <div id="fade"></div>
 <div id="menu">
-  <div class="mtop"><h1>WYMIARY</h1><span class="tagline">strzelanka w przestrzeniach, które łamią intuicję</span><span id="prep"></span><span id="ver"></span></div>
+  <div class="mtop"><h1>WYMIARY</h1><span class="tagline">strzelanka w przestrzeniach, które łamią intuicję</span><span id="prep"></span><span id="net"></span><span id="ver"></span></div>
   <div id="upd" hidden><b></b><small></small><button id="updBtn">⟳ Aktualizuj teraz</button></div>
   <div class="mbody">
     <div id="mapList"></div>
@@ -114,6 +126,7 @@
       <div id="dThumb"></div>
       <div id="dName"></div>
       <div class="tags" id="dTags"></div>
+      <div id="dPeers"></div>
       <p id="dDesc"></p>
       <div id="dModesWrap"><h3>Tryb gry</h3><div id="dModes"></div></div>
       <div id="dSetWrap"><h3>Ustawienia mapy</h3><div id="dSet"></div></div>
@@ -137,6 +150,7 @@
 <script src="js/weapons.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/net.js"></script>
+<script src="js/mp.js"></script>
 <script src="js/monsters.js"></script>
 <script src="js/enemies.js"></script>
 <script src="js/worlds/building.js"></script>

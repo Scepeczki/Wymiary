@@ -181,6 +181,7 @@
       E.world = w; E.worldIndex = i;
       w.enter(opts);
       if (w.bullets) w.bullets.clear();
+      WGun.refill();
       document.getElementById('hudName').textContent = `${i + 1}. ${w.name}`;
       document.getElementById('hudSub').textContent = w.subtitle || '';
       document.getElementById('help').textContent = (w.help || []).join('\n') +
@@ -221,6 +222,7 @@
         if (n >= 1 && n <= E.worlds.length) E.switchWorld(n - 1);
       }
       if (e.code === 'KeyM' || e.code === 'Tab' || e.code === 'KeyH') E.unlock();
+      if (e.code === 'KeyR' && E.world && E.world.bullets) WGun.reload();
       if (e.code === 'KeyP') { E.projMode = (E.projMode + 1) % E.PROJ_NAMES.length; E.toast('Projekcja: ' + E.PROJ_NAMES[E.projMode]); }
       if (e.code === 'BracketLeft') { E.resScale = Math.max(0.25, E.resScale - 0.1); E.toast('Rozdzielczość ' + Math.round(E.resScale * 100) + '%', 700); }
       if (e.code === 'BracketRight') { E.resScale = Math.min(1.5, E.resScale + 0.1); E.toast('Rozdzielczość ' + Math.round(E.resScale * 100) + '%', 700); }
@@ -244,12 +246,15 @@
     if (w && w.prog) {
       const look = { dx: E.mouseDX * 0.0022, dy: E.mouseDY * 0.0022 };
       E.mouseDX = E.mouseDY = 0;
+      WMP.update(dt);
       w.update(dt, look);
       if (E.onFrame) E.onFrame(dt);
       WGun.update(dt);
       if (w.bullets) {
-        if (E.fireHeld && (!w.canFire || w.canFire()) && WGun.tryFire()) {
-          w.bullets.fire(w.aim());
+        if (E.fireHeld && !WMP.dead() && (!w.canFire || w.canFire()) && WGun.tryFire()) {
+          const aim = w.aim();
+          w.bullets.fire(aim);
+          WMP.shot(w, aim);
           if (window.WAudio) WAudio.shot(w);
           if (w.onFire) w.onFire();
         }
@@ -266,7 +271,7 @@
       gl.uniform1i(w.prog.u('uProj'), E.projMode);
       gl.uniform1f(w.prog.u('uFov'), E.fov);
       w.setUniforms(gl, w.prog);
-      WGun.setUniforms(gl, w.prog, !!w.bullets);
+      WGun.setUniforms(gl, w.prog, !!w.bullets && !WMP.dead());
       if (w.setBulletUniforms) w.setBulletUniforms(gl, w.prog);
       else if (w.bullets) w.bullets.setUniforms(gl, w.prog); else gl.uniform1i(w.prog.u('uBulletN'), 0);
       gl.bindVertexArray(E.vao);

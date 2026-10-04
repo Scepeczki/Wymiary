@@ -17,9 +17,10 @@ pobrać, a w trakcie gry pokazuje w menu ramkę **Nowa wersja… → Aktualizuj 
 i uruchomi ponownie). W menu Start jest też *Wymiary – sprawdź aktualizacje*. *Wymiary – dołącz do gry* dodatkowo
 wyrównuje wersję z serwerem, do którego się łączysz.
 
-**Gra we dwóch:** jeden gracz uruchamia *Wymiary – gra sieciowa (serwer)* (za pierwszym razem gra sama pobierze
-przenośny Node.js), drugi *Wymiary – dołącz do gry* i wpisuje adres pokazany w oknie serwera. Z innego domu:
-oba komputery w tej samej sieci [Tailscale](https://tailscale.com) → adres `100.x.x.x:8080`.
+**Gra we dwóch — na każdej mapie i w każdym trybie:** jeden gracz uruchamia *Wymiary – gra sieciowa (serwer)* (za pierwszym
+razem gra sama pobierze przenośny Node.js), drugi *Wymiary – dołącz do gry* i wpisuje adres pokazany w oknie serwera.
+W menu widać, na której mapie gra drugi gracz (przycisk **Dołącz**). Z innego domu: oba komputery w tej samej sieci
+[Tailscale](https://tailscale.com) → adres `100.x.x.x:8080`.
 
 ## Wydawanie aktualizacji (dla autora)
 
@@ -47,12 +48,12 @@ Postęp widać w zakładce **Actions** repozytorium, gotowe wydania w **Releases
 | | |
 |---|---|
 | WASD / mysz / Spacja / Shift | ruch, rozglądanie, skok, bieg |
-| LPM (przytrzymaj = seria) | strzał z pistoletu |
+| LPM (przytrzymaj = seria) | strzał z pistoletu (magazynek 12 naboi, licznik w lewym dolnym rogu) |
+| R | przeładowanie (animacja: broń unosi się, stary magazynek wypada, nowy wchodzi; pusty magazynek przeładowuje sam) |
 | Esc / M | menu wyboru map (świat renderuje się obok, na dole suwaki mapy) · **1–7** szybki wybór |
-| Arena pętli: R | przeładowanie (magazynek 12 naboi) |
 | P | tryb projekcji: perspektywa, rybie oko 360°, panorama, perspektywa odwrócona, ortogonalna |
 | kółko myszy | FOV · **[ ]** rozdzielczość renderu · **N** noclip · **V** dźwięk wł./wył. |
-| 4D: R/F, Q/E, Z/C, X, G | krok w W, obrót przód↔W, obrót prawo↔W, reset obrotu, kompas 4D: widok stały / za tobą |
+| 4D: T/G, Q/E, Z/C, X, B | krok w W (ana / kata), obrót przód↔W, obrót prawo↔W, reset obrotu, kompas 4D: widok stały / za tobą |
 | Korytarze K: Q/E, X | K całej mapy, płasko (to samo suwakiem w menu); tryb z potworami wybierasz na karcie mapy |
 | Wolne światło: Q/E, L, F, B/J/K | prędkość światła, wszystkie lampy, lampa na celowniku, aberracja / Doppler / opóźnienie światła |
 
@@ -62,7 +63,7 @@ Postęp widać w zakładce **Actions** repozytorium, gotowe wydania w **Releases
 2. **Tesserakt 4D** — prawdziwe 4D (x,y,z,w); widzisz przekrój 3D. Start w klatce, z której wychodzi się przez W.
    W rogu **kompas 4D**: pion (y) nigdy się nie obraca, więc cały ruch i obroty dzieją się w 3-wymiarowej przestrzeni
    (x, z, w) — kompas rysuje ją jako model 3D (podłoga mapki = x/z, pion mapki = W): Ty ze śladem, płaszczyzna
-   przekroju, który widzisz, kierunek przodu, ukryty kierunek ana (R) i punkty orientacyjne (`js/compass4d.js`).
+   przekroju, który widzisz, kierunek przodu, ukryty kierunek ana (T) i punkty orientacyjne (`js/compass4d.js`).
 3. **Przestrzeń hiperboliczna** — H³ (model hiperboloidy), plaster {4,3,5}: pięć sześcianów wokół każdej krawędzi.
 4. **Przestrzeń sferyczna** — S³, skończony świat z 8 sześcianów tesseraktu; obiekt na antypodzie wypełnia niebo.
 5. **Pętla (3-torus)** — pokój sklejony sam ze sobą; widzisz nieskończenie wiele swoich kopii.
@@ -86,11 +87,16 @@ dwuklik na karcie od razu ją uruchamia.
 
 ## Korytarze K
 
-Budynek w przestrzeni o metryce konforemnie płaskiej g = e^{2φ}·δ, φ = φ_globalne + φ_bańki:
+Budynek 5 × 5 pokoi połączonych korytarzami, w przestrzeni o metryce konforemnie płaskiej g = e^{2φ}·δ,
+φ = φ_globalne + φ_pokoje + φ_bańki:
+- **Własne K pokoi i korytarzy**: prawie każdy pokój (K od −0,05 do +0,06) i korytarz (od −0,25 do +0,35) jest bańką stałej
+  krzywizny, która wygasa przy drzwiach (tabele `ROOM_K`, `COR_X`, `COR_Z` w `js/worlds/building.js`). Kolor ścian
+  pokazuje krzywiznę: pomarańczowy K>0 (sfera — soczewka, rzeczy rosną), niebieski K<0 (hiperbola — rzeczy maleją).
+  Pokój startowy jest płaski. Korytarze z dużym K działają jak szklane kule.
 - **K całej mapy** (suwak): φ = −ln(1 + K r²/4) wokół środka mapy — cała mapa leży w przestrzeni o stałej krzywiźnie K
-  (mapa stereograficzna S³ dla K>0, kula Poincarégo H³ dla K<0). Zakres ujemny jest mniejszy (−0,006), bo budynek musi
-  zmieścić się w kuli Poincarégo; przy skrajnym ustawieniu najdalsze narożniki łagodnie się wypłaszczają.
-- **Potwory** (tryb „Z potworami”): 6 blokowych zombie chodzi po budynku (graf pokoi i korytarzy), trzyma dystans i strzela.
+  (mapa stereograficzna S³ dla K>0, kula Poincarégo H³ dla K<0). Zakres ujemny jest mniejszy (−0,0015), bo cały budynek
+  (promień ~52 m) musi zmieścić się w kuli Poincarégo.
+- **Potwory** (tryb „Z potworami”): 8 blokowych zombie chodzi po budynku (graf pokoi i korytarzy), trzyma dystans i strzela.
   Każdy nosi bańkę zakrzywionej przestrzeni — pomarańczowe K = +0,9 (soczewka), niebieskie K = −0,6 — a ich wolne fioletowe
   pociski to latające soczewki. Wszystko to wchodzi do metryki: zakrzywia obraz, Twoje pociski i dźwięk. 3 trafienia zabijają.
 - Promienie całkowane są krokiem adaptacyjnym (skręt ≤ 0,08 rad na krok); HUD pokazuje lokalne K liczone z krzywizny skalarnej
@@ -124,43 +130,42 @@ Prawie każde miejsce ma zapętlony fragment (portal bez szwów — działa na o
 - **środek mapy**: korytarz z trzema sklejonymi bocznymi przejściami, hala bez podłogi z kamieniami i półkami (dno sklejone
   z sufitem), plac-torus.
 
-Tryby (karta mapy w menu): zwiedzanie, bot łatwy/trudny, **gra sieciowa**. Bot ma 100 HP, ten sam pistolet (20 obrażeń),
-magazynek 12, przeładowanie 1,7 s; chodzi po grafie ~200 węzłów (także przez wszystkie pętle), strzela seriami z wyprzedzeniem,
+Tryby (karta mapy w menu): zwiedzanie, bot łatwy/trudny, **gra sieciowa** (drużyny A/B, bazy po dwóch stronach).
+Bot ma 100 HP, ten sam pistolet (20 obrażeń), magazynek 12, przeładowanie 1,7 s; chodzi po grafie ~200 węzłów (także przez wszystkie pętle), strzela seriami z wyprzedzeniem,
 chowa się, przeładowuje, wychyla. Geometria i portale są w teksturze danych (szybki shader). Test bez GPU: `node tools/dev/duel.js`.
 
-## Gra sieciowa (np. z bratem)
+## Gra sieciowa (np. z bratem) — każda mapa, każdy tryb
 
-1. Na swoim komputerze uruchom skrót **„Wymiary – gra sieciowa”** (`launcher\host.cmd`). Otworzy się okno serwera z adresami
-   i gra w trybie sieciowym.
+1. Na swoim komputerze uruchom skrót **„Wymiary – gra sieciowa (serwer)”** (`launcher\host.cmd`). Otworzy się okno serwera
+   z adresami i gra (menu map).
 2. Brat klika **„Wymiary – dołącz do gry”** i wpisuje adres z okna serwera (np. `192.168.1.55:8080`, a przez Tailscale
-   adres `100.x.x.x:8080`). Bez instalacji wystarczy przeglądarka: `http://192.168.1.55:8080/?w=7&mode=3`.
-3. Pierwszy gracz dostaje drużynę A (baza południowa), drugi B. Wynik i życie przeciwnika są na górze ekranu.
-4. Jeśli Windows zapyta o zaporę — zezwól na sieci prywatne. Przez Internet (inna sieć) potrzebne jest przekierowanie portu
-   8080 na routerze albo VPN typu ZeroTier / Tailscale / Radmin VPN.
+   adres `100.x.x.x:8080`). Bez instalacji wystarczy przeglądarka: `http://192.168.1.55:8080/`.
+3. Obaj wybieracie w menu **tę samą mapę i ten sam tryb** — karta mapy pokazuje, kto na niej gra, a w panelu mapy jest
+   przycisk **Dołącz** (wybiera mapę i tryb drugiego gracza). Gra otwarta z serwera sama podpowiada mapę, na której ktoś już gra.
+4. Jeśli Windows zapyta o zaporę — zezwól na sieci prywatne.
 
-Działanie: każdy liczy swój ruch u siebie i wysyła stan 20×/s; trafienia ocenia strzelający, ofiara odejmuje życie
-(`js/net.js`, `server/server.js` — czysty Node, bez pakietów). Test dwóch klientów na jednym PC: `node tools/dev/mptest.js <katalog>`.
+Co znaczy wspólna gra w danym trybie:
+- **Bez potworów / bota** (zwiedzanie, spokój, gra sieciowa na arenie) — **pojedynek**: widzicie się (w 4D jako przekroje
+  4-wymiarowej postaci, w H³/S³ wzdłuż geodezyjnych, w 3-torusie w nieskończenie wielu kopiach, w Wolnym świetle z opóźnieniem
+  światła), strzelacie do siebie (25 obrażeń), po śmierci odrodzenie po 3 s, na górze wynik.
+- **Z potworami / z botem** — **kooperacja**: potwory (bota) prowadzi gracz o najniższym numerze („lider”), wysyła ich stan
+  12×/s, a pozostali widzą je płynnie i ich trafienia trafiają do lidera. Potwory celują w najbliższego żywego gracza,
+  przy dwóch graczach fale są większe. Po śmierci odradzasz się po 3 s, gra toczy się dalej.
 
-## Instalator i aktualizacje (dla drugiego komputera)
+Jak to działa (`js/mp.js`, `js/net.js`, `server/server.js` — czysty Node, bez pakietów): pokój = mapa + tryb. Każdy liczy
+swój ruch u siebie i wysyła stan 20×/s (geometria zakodowana przez adapter przestrzeni z `js/enemies.js`: stopy + kierunek
+w 3D, cała rama w 4D i w H³/S³). H³ ciągle przecentrowuje świat na gracza, więc pozycje idą we wspólnych współrzędnych
+(złożenie wszystkich przecentrowań). Trafienia w graczy ocenia strzelający, ofiara odejmuje życie.
+Testy: `node tools/dev/mpsim.js` (dwóch klientów w jednym procesie, wszystkie mapy i tryby) i
+`node tools/dev/mptest.js <katalog> [mapa] [tryb] …` (serwer + dwa okna przeglądarki, zrzuty ekranu).
 
-Zbuduj instalatory: `powershell -ExecutionPolicy Bypass -File tools\build-installer.ps1` → katalog `dist\`:
-- **`Wymiary-gra.exe`** (~33 MB) — pełna instalacja: gra + Node.js (żeby drugi gracz też mógł hostować). Instaluje bez
-  uprawnień administratora do `%LOCALAPPDATA%\Programs\Wymiary`, tworzy skróty (pulpit + menu Start) i wpis w
-  „Aplikacje i funkcje” (odinstalowanie).
-- **`Wymiary-nowa-wersja.exe`** (~0,3 MB) — same pliki gry; uruchomiony na zainstalowanej grze aktualizuje ją.
-
-Skróty po instalacji: *Wymiary* (gra offline), *Wymiary – dołącz do gry*, *Wymiary – gra sieciowa (serwer)*.
-
-**Aktualizacje same się rozchodzą:** „Dołącz do gry” pyta o adres serwera (zapamiętuje go), porównuje sumy SHA-256 plików
-z serwerem i pobiera tylko zmienione. Wystarczy, że zmienisz grę u siebie i uruchomisz serwer — brat przy następnym
-dołączeniu dostaje tę samą wersję. Wersję serwer liczy sam (data + skrót zawartości) i pokazuje w swoim oknie.
-`Wymiary-nowa-wersja.exe` przydaje się tylko, gdy brat ma grać bez łączenia się z Tobą.
-
-Windows SmartScreen może ostrzec przed nieznanym plikiem .exe: „Więcej informacji” → „Uruchom mimo to”.
+**Aktualizacje przez serwer:** „Dołącz do gry” porównuje sumy SHA-256 plików z serwerem i pobiera tylko zmienione, więc brat
+gra zawsze tą samą wersją co serwer. Niezależnie od tego zainstalowana gra sama pobiera nowe wydania z GitHuba (patrz wyżej).
 
 ## Strzelanie
 
-Pocisk to świecący punkt lecący po geodezyjnych danej przestrzeni plus uproszczona grawitacja: w H³/S³ dokładny przepływ geodezyjny na hiperboloidzie/sferze, w 4D lot w czterech wymiarach, w torusie zawijanie (pocisk wraca i może trafić strzelca), w Korytarzach K równanie geodezyjnych metryki konforemnej. Trafienia wykrywają te same sondy SDF na GPU co kolizje gracza (`js/weapons.js`).
+Pocisk to świecący punkt lecący szybko (ok. 50–60 m/s, zasięg ponad 200 m) po geodezyjnych danej przestrzeni plus słaba
+grawitacja (opada łagodnie): w H³/S³ dokładny przepływ geodezyjny na hiperboloidzie/sferze, w 4D lot w czterech wymiarach, w torusie zawijanie (pocisk wraca i może trafić strzelca), w Korytarzach K równanie geodezyjnych metryki konforemnej. Trafienia wykrywają te same sondy SDF na GPU co kolizje gracza (`js/weapons.js`).
 
 ## Dźwięk
 

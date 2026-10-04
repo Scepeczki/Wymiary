@@ -18,7 +18,7 @@ uniform float uFov;
 uniform vec4 uBullets[${G.MAX_BULLETS}];
 uniform float uBulletR[${G.MAX_BULLETS}];
 uniform int uBulletN;
-uniform float uGunKick, uGunFlash, uGunShow;
+uniform float uGunKick, uGunFlash, uGunShow, uGunReload;
 out vec4 fragColor;
 
 float hash11(float p){ p = fract(p*.1031); p *= p+33.33; p *= p+p; return fract(p); }
@@ -68,8 +68,14 @@ vec3 post(vec3 col, vec2 fc){
 // ---------- the pistol, drawn in camera space (x right, y up, z forward) ----------
 mat2 grot(float a){ float c = cos(a), s = sin(a); return mat2(c,-s,s,c); }
 const vec3 GUN_POS = vec3(.19, -.21, .5);
+// reload: 0..1 while reloading. The gun dips and rolls inwards, the magazine drops out and a new one slides in.
+float reloadPose(){ float r = uGunReload; return r <= 0. ? 0. : smoothstep(0., .18, r)*(1. - smoothstep(.82, 1., r)); }
 vec3 gunSpace(vec3 p){
   vec3 q = p - GUN_POS;
+  float rp = reloadPose();
+  q.y -= rp*.06; q.x += rp*.08;                     // towards the middle of the view
+  q.xy = grot(rp*.45)*q.xy;                         // roll the gun inwards
+  q.yz = grot(rp*.95)*q.yz;                         // muzzle up: the bottom of the grip turns towards you
   q.z += uGunKick*.05;
   vec2 piv = vec2(-.06,-.05);
   q.yz = grot(-uGunKick*.35)*(q.yz - piv) + piv;   // recoil: muzzle kicks up around the grip
@@ -82,12 +88,20 @@ vec2 gunMap(vec3 p){
   float frame = sdBox(q - vec3(0,-.006,.02), vec3(.023,.013,.112)) - .002;
   vec3 g = q - vec3(0,-.075,-.06); g.yz = grot(-.3)*g.yz;
   float grip = sdBox(g, vec3(.022,.07,.03)) - .004;
+  // magazine, along the grip: out (falling) 0.12-0.45, gone, then in (sliding up) 0.55-0.85
+  float rl = uGunReload, off = 0.;
+  if (rl > .12 && rl < .45) off = (rl - .12)/.33*.32;
+  else if (rl >= .45 && rl < .55) off = 1e3;
+  else if (rl >= .55 && rl < .85) off = (1. - (rl - .55)/.3)*.16;
+  vec3 mq = g - vec3(0,-off,0);
+  float mag = sdBox(mq - vec3(0,-.012,0), vec3(.017,.07,.024)) - .002;
   float guard = max(sdBox(q - vec3(0,-.035,.035), vec3(.005,.024,.036)), -sdBox(q - vec3(0,-.03,.038), vec3(.01,.017,.027)));
   float sights = min(sdBox(q - vec3(0,.057,.145), vec3(.004,.006,.006)), sdBox(q - vec3(0,.057,-.085), vec3(.013,.006,.006)));
   vec2 r = vec2(slide, 1.);
   r = opU(r, vec2(frame, 2.));
   r = opU(r, vec2(min(grip, guard), 3.));
   r = opU(r, vec2(sights, 4.));
+  if (off > .001 && off < 10.) r = opU(r, vec2(mag, 5.));
   return r;
 }
 // returns rgb + coverage
@@ -99,7 +113,7 @@ vec4 gunTrace(vec3 lo, vec3 ld){
   float dm = length(m - ld*max(dot(m, ld), 0.));
   vec3 flash = vec3(1.,.72,.3)*uGunFlash*(.0012/(dm*dm + .0006));
   // bounding sphere
-  float b = dot(GUN_POS, ld), c = dot(GUN_POS, GUN_POS) - .3*.3, disc = b*b - c;
+  float b = dot(GUN_POS, ld), c = dot(GUN_POS, GUN_POS) - .45*.45, disc = b*b - c;
   if (disc > 0.) {
     float t = max(b - sqrt(disc), 0.), t1 = b + sqrt(disc);
     for (int i = 0; i < 48; i++){
@@ -109,13 +123,13 @@ vec4 gunTrace(vec3 lo, vec3 ld){
         const vec2 k = vec2(1,-1); const float e = .0005;
         vec3 n = normalize(k.xyy*gunMap(p+k.xyy*e).x + k.yyx*gunMap(p+k.yyx*e).x + k.yxy*gunMap(p+k.yxy*e).x + k.xxx*gunMap(p+k.xxx*e).x);
         vec3 q = gunSpace(p);
-        vec3 alb = h.y < 1.5 ? vec3(.16,.17,.19) : h.y < 2.5 ? vec3(.1,.1,.11) : h.y < 3.5 ? vec3(.07,.06,.055) : vec3(1.,.45,.1);
+        vec3 alb = h.y < 1.5 ? vec3(.16,.17,.19) : h.y < 2.5 ? vec3(.1,.1,.11) : h.y < 3.5 ? vec3(.07,.06,.055) : h.y < 4.5 ? vec3(1.,.45,.1) : vec3(.22,.23,.26);
         if (h.y < 1.5 && q.z < -.05 && q.y > .02) alb *= .6 + .4*step(.5, fract(q.z*110.));   // slide serrations
         vec3 L = normalize(vec3(-.4,.8,-.35));
         float dif = max(dot(n, L), 0.);
         float spec = pow(max(dot(reflect(ld, n), L), 0.), 24.);
         vec3 col = alb*(.35 + 1.4*dif) + spec*.35 + alb*uGunFlash*2.;
-        if (h.y > 3.5) col = alb*2.;
+        if (h.y > 3.5 && h.y < 4.5) col = alb*2.;
         res = vec4(col, 1.);
         break;
       }

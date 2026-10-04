@@ -324,7 +324,7 @@
     { react: 0.75, spread: 0.07, lead: 0.4, gap: 0.27, burst: [2, 3], pause: [0.7, 1.3], speed: 3.4, cover: 0.45 },
     { react: 0.3, spread: 0.03, lead: 0.85, gap: 0.17, burst: [3, 5], pause: [0.35, 0.7], speed: 4.4, cover: 0.85 },
   ];
-  const DMG = 20, MAG = 12, RELOAD = 1.7, BULLET_SPEED = 40, BULLET_G = 2;
+  const DMG = 20, MAG = 12, RELOAD = 1.7, BULLET_SPEED = 60, BULLET_G = 1;
   const rnd = (a, b) => a + Math.random() * (b - a);
 
   class Rival {
@@ -337,12 +337,15 @@
       });
     }
     get eye() { return [this.p[0], this.p[1] + 1.55, this.p[2]]; }
-    // player bullet at q
-    hit(q) {
+    inBody(q) {
       if (this.dead >= 0 || this.hp <= 0) return false;
-      const d = Math.hypot(q[0] - this.p[0], q[1] - WM.clamp(q[1], this.p[1] + 0.25, this.p[1] + 1.75), q[2] - this.p[2]);
-      if (d > 0.45) return false;
-      this.hp -= DMG; this.flash = 1; this.hurtT = WE.time;
+      return Math.hypot(q[0] - this.p[0], q[1] - WM.clamp(q[1], this.p[1] + 0.25, this.p[1] + 1.75), q[2] - this.p[2]) <= 0.45;
+    }
+    // player bullet at q
+    hit(q) { return this.inBody(q) && this.takeDamage(DMG); }
+    takeDamage(dmg) {
+      if (this.dead >= 0 || this.hp <= 0) return false;
+      this.hp -= dmg; this.flash = 1; this.hurtT = WE.time;
       if (this.hp <= 0) { this.dead = 0; this.w.rivalDied(); return true; }
       if (this.state !== 'cover' && (this.hp <= 40 || (this.hp <= 60 && Math.random() < this.w.diff.cover))) this.goCover();
       return true;
@@ -365,7 +368,7 @@
       }
     }
     goCover() {
-      const pl = this.w.player.pos, chest = [pl[0], pl[1] - 0.3, pl[2]];
+      const pl = (this.w.botTarget(this.eye) || this.w.player).pos, chest = [pl[0], pl[1] - 0.3, pl[2]];
       const D = dijkstra(nearestNode(this.p));
       let best = -1, bc = Infinity;
       NODES.forEach((q, i) => {
@@ -389,12 +392,13 @@
       return null;
     }
     update(dt) {
-      const w = this.w, df = w.diff, pl = w.player;
+      const w = this.w, df = w.diff;
       this.flash = Math.max(0, this.flash - dt * 4);
       if (this.dead >= 0) { this.dead += dt; return; }
-      const eye = this.eye, chest = [pl.pos[0], pl.pos[1] - 0.35, pl.pos[2]];
+      const eye = this.eye, pl = w.botTarget(eye) || { pos: [this.p[0], -1e3, this.p[2]], vel: [0, 0, 0], alive: false };
+      const chest = [pl.pos[0], pl.pos[1] - 0.35, pl.pos[2]];
       const dist = WM.len(WM.sub(chest, eye));
-      const vis = w.playerAlive && dist < 55 && los(eye, chest);
+      const vis = pl.alive && dist < 55 && los(eye, chest);
       if (vis && !this.vis) this.react = df.react * rnd(0.8, 1.3);
       this.vis = vis;
       if (vis) { this.seenT = WE.time; this.lastSeen = pl.pos.slice(); }
@@ -450,7 +454,9 @@
         let dir = WM.norm(WM.sub(aim, muzzle));
         const sp = df.spread * (1 + WM.len(pl.vel) / 8);
         dir = WM.norm(WM.add(dir, [rnd(-sp, sp), rnd(-sp, sp), rnd(-sp, sp)]));
-        w.rivalShots.fire({ pos: WM.addScaled(muzzle, dir, -0.35), dir });
+        const shot = { pos: WM.addScaled(muzzle, dir, -0.35), dir };
+        w.rivalShots.fire(shot);
+        WMP.aiShot(w, shot);
         WAudio.at(w, muzzle, 'shot');
         this.ammo--; this.burst--;
         this.cool = this.burst > 0 ? df.gap : rnd(df.pause[0], df.pause[1]);
@@ -753,14 +759,9 @@ vec3 material(float id, vec3 p, vec3 n, inout float emit){
     modes: [{ label: 'Zwiedzanie', opts: { mode: 0 } }, { label: 'Bot: łatwy', opts: { mode: 1 } }, { label: 'Bot: trudny', opts: { mode: 2 } }, { label: 'Gra sieciowa', opts: { mode: 3 } }],
     shader: () => WG.euclid(code, '#define PORTALS\n#define FOG_DENS .011\n#define MAX_T 170.\n#define SUN_DIR normalize(vec3(.45,.8,.25))\n'),
     reverb: 0.15,
-    mode: 0, score: [0, 0], ammo: MAG, reloadT: 0, playerAlive: true, rivalShotT: -9, rivalSeen: false, respawnT: 0, team: 'A',
+    mode: 0, score: [0, 0], playerAlive: true, rivalShotT: -9, rivalSeen: false, respawnT: 0, team: 'A',
     aim() { return this.player.aim(); },
-    canFire() { return this.playerAlive && this.ammo > 0 && this.reloadT <= 0; },
-    onFire() {
-      this.ammo--; if (this.ammo === 0) this.startReload();
-      if (this.mode === 3) { const a = this.player.aim(); WNet.send({ t: 'f', p: a.pos, d: a.dir }); }
-    },
-    startReload() { if (this.reloadT <= 0 && this.ammo < MAG) { this.reloadT = RELOAD; } },
+    canFire() { return this.playerAlive; },
     // a spawn point of the team, preferably far from (and not visible to) the enemies
     spawn(list, enemies) {
       let best = null, bd = -Infinity;
@@ -774,13 +775,26 @@ vec3 material(float id, vec3 p, vec3 n, inout float emit){
     },
     ownSpawns() { return this.team === 'B' ? SPAWN_B : SPAWN_A; },
     enemyEyes() {
-      if (this.mode === 3) return WNet.peerList().filter(p => p.alive).map(p => [p.p[0], p.p[1] + 1.55, p.p[2]]);
-      return this.mode && this.rival.dead < 0 ? [this.rival.eye] : [];
+      if (this.isBot()) return this.rival.dead < 0 ? [this.rival.eye] : [];
+      return WMP.avatars(this).filter(a => a.alive).map(a => [a.g.p[0], a.g.p[1] + 1.55, a.g.p[2]]);
+    },
+    isBot() { return this.mode === 1 || this.mode === 2; },
+    // the bot shoots at the nearest living player it can see (or the nearest one): { pos (eye), vel, alive }
+    botTarget(from) {
+      const c = [];
+      if (this.playerAlive && !WMP.dead()) c.push({ pos: this.player.pos, vel: this.player.vel, alive: true });
+      for (const a of WMP.avatars(this)) if (a.alive) c.push({ pos: [a.g.p[0], a.g.p[1] + WPlayer.EYE, a.g.p[2]], vel: [0, 0, 0], alive: true });
+      let best = null, bd = Infinity;
+      for (const t of c) {
+        const d = WM.len(WM.sub(t.pos, from)) + (los(from, t.pos) ? 0 : 1000);
+        if (d < bd) { bd = d; best = t; }
+      }
+      return best;
     },
     respawnMe() {
       const sp = this.spawn(this.ownSpawns(), this.enemyEyes());
       this.player.reset([sp[0], sp[1] + WPlayer.EYE, sp[2]], this.team === 'B' ? Math.PI : 0);
-      this.health = this.mode ? 100 : null; this.playerAlive = true; this.ammo = MAG; this.reloadT = 0;
+      this.health = this.isBot() ? 100 : null; this.playerAlive = true; WGun.refill();
     },
     enter(opts = {}) {
       buildNav();
@@ -789,51 +803,39 @@ vec3 material(float id, vec3 p, vec3 n, inout float emit){
         this.player.onStep = (a, b) => { const off = crossPortal(a, b); if (off) for (let i = 0; i < 3; i++) b[i] += off[i]; };
         this.rival = new Rival(this);
         this.bullets = new WBullets(WBallistics.flat(3, { speed: BULLET_SPEED, gravity: BULLET_G, cross: crossPortal }), { hitTest: q => this.myBulletHit(q) });
+        // the bot's bullets: the room's leader decides whom they hit (you or another player); for the others they are visual
         this.rivalShots = new WBullets(WBallistics.flat(3, { speed: BULLET_SPEED, gravity: BULLET_G, cross: crossPortal }), {
-          // bot bullets hurt you; network bullets are only visual (the shooter decides about hits)
-          hitTest: q => { if (this.mode !== 3 && this.playerAlive && capsule(q, this.feet())) { this.damage(DMG); return true; } return false; },
+          hitTest: q => {
+            if (!WMP.isLeader(this)) return this.playerAlive && capsule(q, this.feet());
+            const t = WMP.targets(this).find(t => capsule(q, [t.eye[0], t.eye[1] - WPlayer.EYE, t.eye[2]]));
+            if (t) { WMP.hurt(this, t, DMG); return true; }
+            return false;
+          },
         });
-        window.addEventListener('keydown', e => { if (e.code === 'KeyR' && !e.repeat && WE.world === world) world.startReload(); });
       }
       if (opts.mode != null) { this.mode = opts.mode; this.score = [0, 0]; }
-      if (this.mode !== 3 && WNet.connected()) WNet.close();
       this.diff = DIFF[this.mode] || DIFF[1];
-      this.team = 'A';
+      // teams (spawn bases) only in the network game; otherwise everybody starts in base A
+      this.team = this.mode === 3 && WMP.online() ? WNet.team : 'A';
+      if (this.mode === 3 && !WMP.online()) WE.toast('Gra sieciowa: uruchom skrót „Wymiary – gra sieciowa (serwer)”, a drugi gracz „Wymiary – dołącz do gry”. Na każdej mapie można grać razem.', 7000);
       this.rivalShots.clear(); this.mePh = 0;
       this.rival.hp = 0; this.rival.dead = 99;
-      if (this.mode === 3) this.startNet();
       this.respawnMe();
-      if (this.mode === 1 || this.mode === 2) { this.rival.reset(this.spawn(SPAWN_B, [this.player.pos])); WE.toast('Pojedynek! Bot startuje z bazy B.', 2500); }
+      if (this.isBot()) {
+        this.rival.reset(this.spawn(SPAWN_B, [this.player.pos]));
+        if (!WMP.isLeader(this)) this.rival.dead = 99;           // the leader's bot arrives with its first snapshot
+        WE.toast('Pojedynek! Bot startuje z bazy B.', 2500);
+      }
     },
     feet() { const p = this.player.pos; return [p[0], p[1] - WPlayer.EYE, p[2]]; },
     myBulletHit(q) {
-      if (this.mode === 1 || this.mode === 2) return this.rival.hit(q);
-      if (this.mode === 3) {
-        for (const p of WNet.peerList()) {
-          if (!p.alive || !capsule(q, p.p)) continue;
-          p.flash = 1;
-          WNet.send({ t: 'h', to: p.id, dmg: DMG });
-          return true;
-        }
+      if (this.isBot()) {
+        if (WMP.isLeader(this)) return this.rival.hit(q);
+        if (!this.rival.inBody(q)) return false;
+        this.rival.flash = 1; WMP.aiHit(this, 0, DMG);           // co-op: the leader runs the bot
+        return true;
       }
-      return false;
-    },
-    // ---- network game ----
-    startNet() {
-      if (!/^https?:/.test(location.protocol)) {
-        WE.toast('Gra sieciowa: uruchom skrót „Wymiary – gra sieciowa” (serwer), a brat otwiera adres, który pokaże serwer.', 7000);
-        this.mode = 0; return;
-      }
-      this.kills = {}; this.netT = 0;
-      WNet.connect({
-        welcome: m => { this.team = m.team; this.respawnMe(); WE.toast(`Połączono — jesteś w drużynie ${m.team} (${m.team === 'A' ? 'niebieska, południe' : 'czerwona, północ'})`, 3500); },
-        join: m => WE.toast(`Dołączył gracz ${m.id} (drużyna ${m.team})`, 2500),
-        leave: m => WE.toast(`Gracz ${m.id} wyszedł`, 2500),
-        f: m => { this.rivalShots.fire({ pos: m.p, dir: m.d }); WAudio.at(this, m.p, 'shot'); },
-        h: m => { if (m.to === WNet.id) this.damage(m.dmg, m.from); },
-        d: m => { this.kills[m.by] = (this.kills[m.by] || 0) + 1; if (m.by === WNet.id) WE.toast('Trafiony i zabity!', 1500); },
-        error: () => { WE.toast('Brak połączenia z serwerem gry.', 4000); },
-      });
+      return WMP.hitPeers(q);
     },
     damage(n, from) {
       if (this.health == null || !this.playerAlive) return;
@@ -841,8 +843,34 @@ vec3 material(float id, vec3 p, vec3 n, inout float emit){
       WE.hurt();
       if (this.health <= 0) {
         this.playerAlive = false; this.respawnT = 2.5;
-        if (this.mode === 3) { WNet.send({ t: 'd', by: from }); this.kills[from] = (this.kills[from] || 0) + 1; WE.toast('Zginąłeś!', 2000); }
-        else { this.score[1]++; WE.toast(`Zginąłeś! ${this.score[0]} : ${this.score[1]}`, 2500); }
+        WMP.reportDeath(this, from);
+        if (this.isBot()) {
+          if (WMP.isLeader(this)) this.score[1]++;
+          WE.toast(`Zginąłeś! ${this.score[0]} : ${this.score[1]}`, 2500);
+        } else WE.toast(typeof from === 'number' ? `Zabił cię gracz ${from}!` : 'Zginąłeś!', 2000);
+      }
+    },
+    // another player of the room died (co-op with the bot: the leader keeps the score)
+    onPeerDeath(m) { if (this.isBot() && m.by === 'ai' && WMP.isLeader(this)) this.score[1]++; },
+    // ---- the bot over the network (co-op): snapshot from the leader, hits from the others ----
+    netExport() { const r = this.rival; return { p: r.p, yaw: r.yaw || 0, ph: r.ph || 0, hp: r.hp, dead: r.dead, score: this.score }; },
+    netImport(d) {
+      const r = this.rival, now = performance.now() / 1000;
+      r.prev = r.dead < 0 && d.dead < 0 && r.next ? [r.p[0], r.p[1], r.p[2], r.yaw] : [...d.p, d.yaw];
+      r.next = [...d.p, d.yaw]; r.tP = r.tA || now - 0.08; r.tA = now;
+      if (d.hp < r.hp) r.flash = 1;
+      if (d.dead >= 0 && r.dead < 0) WAudio.at(this, r.eye, 'death');
+      r.hp = d.hp; r.dead = d.dead < 0 ? -1 : Math.max(r.dead, d.dead); r.ph = d.ph; this.score = d.score;
+    },
+    netDamage(slot, dmg) { this.rival.takeDamage(dmg); },
+    followBot(dt) {
+      const r = this.rival, now = performance.now() / 1000;
+      r.flash = Math.max(0, r.flash - dt * 4);
+      if (r.dead >= 0) r.dead += dt;
+      if (r.next) {
+        const f = WM.clamp((now - r.tA) / Math.max(0.03, r.tA - r.tP), 0, 1), a = r.prev, b = r.next;
+        if (Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) > 3) { r.p = b.slice(0, 3); r.yaw = b[3]; }
+        else { let dy = b[3] - a[3]; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); r.p = [0, 1, 2].map(k => a[k] + (b[k] - a[k]) * f); r.yaw = a[3] + dy * f; }
       }
     },
     rivalDied() {
@@ -856,8 +884,8 @@ vec3 material(float id, vec3 p, vec3 n, inout float emit){
       else { this.respawnT -= dt; if (this.respawnT <= 0) this.respawnMe(); }
       pl.vel[1] = Math.max(pl.vel[1], -25);
       this.mePh += Math.hypot(pl.vel[0], pl.vel[2]) * dt * 2.4;
-      if (this.reloadT > 0) { this.reloadT -= dt; if (this.reloadT <= 0) this.ammo = MAG; }
-      if (this.mode === 1 || this.mode === 2) {
+      if (this.isBot() && !WMP.isLeader(this)) this.followBot(dt);
+      else if (this.isBot()) {
         this.rival.update(dt);
         if (this.respawnRival != null) {
           this.respawnRival -= dt;
@@ -865,36 +893,27 @@ vec3 material(float id, vec3 p, vec3 n, inout float emit){
         }
         if (this.rival.vis && this.rival.cool > (this.diff.gap - 0.05)) this.rivalShotT = WE.time;
       }
-      if (this.mode === 3 && WNet.connected()) {
-        this.netT -= dt;
-        if (this.netT <= 0) {
-          this.netT = 0.05;                                          // 20 updates per second
-          const f = pl.forward, feet = this.feet();
-          WNet.send({ t: 's', p: feet, yaw: Math.atan2(f[0], f[2]), ph: this.mePh, alive: this.playerAlive, hp: this.health });
-        }
-        for (const p of WNet.peerList()) p.flash = Math.max(0, (p.flash || 0) - dt * 4);
-      }
       // nobody walks through anybody
       for (const o of this.figures()) {
         if (!o.alive) continue;
         const dx = pl.pos[0] - o.p[0], dz = pl.pos[2] - o.p[2], d = Math.hypot(dx, dz), dy = pl.pos[1] - 1.6 - o.p[1];
         if (d < 0.75 && Math.abs(dy) < 1.7 && d > 1e-3) { pl.pos[0] += dx / d * (0.75 - d); pl.pos[2] += dz / d * (0.75 - d); }
       }
-      if (this.mode) this.rivalShots.update(dt);
+      if (this.isBot()) this.rivalShots.update(dt);
     },
     // everybody else, uniformly: { p: feet, yaw, ph, hp, flash, dead, alive, show, onMap }
     figures() {
-      if (this.mode === 3) return WNet.peerList().map(p => {
-        const seen = p.alive && los(this.player.pos, [p.p[0], p.p[1] + 1.2, p.p[2]]);
-        return { p: p.p, yaw: p.yaw, ph: p.ph, hp: p.hp == null ? 100 : p.hp, flash: p.flash || 0, dead: p.alive ? -1 : 2, alive: p.alive, show: true, onMap: seen };
+      const out = WMP.avatars(this).map(a => {
+        const seen = a.alive && los(this.player.pos, [a.g.p[0], a.g.p[1] + 1.2, a.g.p[2]]);
+        return { p: a.g.p, yaw: a.g.yaw, ph: WE.time * 6, hp: a.hp, flash: a.flash, dead: a.dead, alive: a.alive, show: true, onMap: seen, type: a.type };
       });
-      if (!this.mode) return [];
+      if (!this.isBot()) return out;
       const r = this.rival;
       if (r.dead < 0) this.rivalSeen = los(this.player.pos, [r.p[0], r.p[1] + 1.2, r.p[2]]);
       return [{ p: r.p, yaw: r.yaw || 0, ph: r.ph || 0, hp: Math.max(r.hp, 0), flash: r.flash || 0, dead: r.dead, alive: r.dead < 0, show: r.dead < 1.6,
-        onMap: r.dead < 0 && (this.rivalSeen || WE.time - this.rivalShotT < 1.5) }];
+        onMap: r.dead < 0 && (this.rivalSeen || WE.time - this.rivalShotT < 1.5), type: 3 }, ...out];
     },
-    setBulletUniforms(gl, p) { WBullets.upload(gl, p, [[this.bullets, 0], [this.rivalShots, 1]]); },
+    setBulletUniforms(gl, p) { WBullets.upload(gl, p, [[this.bullets, 0], [this.rivalShots, 1], ...WMP.extraBullets(this).map(([l, e]) => [l, e ? 1 : 0])]); },
     setUniforms(gl, prog) {
       const pl = this.player, f = pl.forward;
       pl.setUniforms3(gl, prog);
@@ -916,7 +935,7 @@ vec3 material(float id, vec3 p, vec3 n, inout float emit){
       const a = new Float32Array(MAXF * 4), s = new Float32Array(MAXF * 4), ph = new Float32Array(MAXF);
       figs.forEach((o, i) => {
         a.set([o.p[0], o.p[1], o.p[2], o.yaw], i * 4);
-        s.set([o.show ? o.hp / 100 : -1, o.flash, o.dead, 3], i * 4);
+        s.set([o.show ? o.hp / 100 : -1, o.flash, o.dead, o.type || 3], i * 4);
         ph[i] = o.ph;
       });
       gl.uniform4fv(prog.u('uOth'), a);
@@ -927,26 +946,22 @@ vec3 material(float id, vec3 p, vec3 n, inout float emit){
     overlaySize: [230, 380],
     drawOverlay(ctx, W, Hh) { drawMap(ctx, W, Hh, this); },
     duelHud() {
-      const ammo = this.reloadT > 0 ? 'przeładowanie…' : `${this.ammo} / ${MAG}`;
-      if (this.mode === 3) {
-        if (!WNet.connected()) return `<div style="font-size:13px">łączenie z serwerem… · amunicja ${ammo}</div>`;
-        const peers = WNet.peerList(), mine = this.kills[WNet.id] || 0;
-        const rows = peers.map(p => `gracz ${p.id}: ${this.kills[p.id] || 0}`).join(' · ') || 'czekam na drugiego gracza…';
-        const hp = peers.length === 1 ? (peers[0].alive ? peers[0].hp : 0) : null;
-        return `<div class="score">TY ${mine} : ${peers.length === 1 ? (this.kills[peers[0].id] || 0) : '–'} ${peers.length === 1 ? 'PRZECIWNIK' : ''}</div>` +
-          (hp != null ? `<div class="bar"><div style="width:${hp}%"></div></div>` : '') +
-          `<div style="font-size:12px;opacity:.8">drużyna ${this.team} · ${rows} · amunicja ${ammo}</div>`;
-      }
-      if (!this.mode) return `<div style="font-size:13px;opacity:.8">amunicja ${ammo}</div>`;
+      if (!this.isBot()) return '';
       const r = this.rival, hp = r.dead < 0 ? Math.max(0, r.hp) : 0;
-      return `<div class="score">TY ${this.score[0]} : ${this.score[1]} BOT</div>` +
-        `<div class="bar"><div style="width:${hp}%"></div></div><div style="font-size:12px;opacity:.8">bot ${hp} HP · twoja amunicja ${ammo}</div>`;
+      return `<div class="score">${WMP.roomPeers(this).length ? 'WY' : 'TY'} ${this.score[0]} : ${this.score[1]} BOT</div>` +
+        `<div class="bar"><div style="width:${hp}%"></div></div><div style="font-size:12px;opacity:.8">bot ${hp} HP</div>`;
     },
     stats() {
       const p = this.player.pos, r = this.rival;
-      if (this.mode === 3) return `pozycja ${p.map(v => v.toFixed(1)).join(', ')}
-sieć: ${WNet.connected() ? `gracz ${WNet.id}, drużyna ${this.team}, inni gracze: ${WNet.peerList().length}` : 'brak połączenia'}`;
-      return `pozycja ${p.map(v => v.toFixed(1)).join(', ')}` + (this.mode === 1 || this.mode === 2 ? `\nbot: ${r.dead >= 0 ? 'nie żyje' : r.state} · ${r.ammo}/${MAG} naboi` : '');
+      return `pozycja ${p.map(v => v.toFixed(1)).join(', ')}` + (this.mode === 3 ? `\ndrużyna ${this.team}` : '') + (this.isBot() ? `\nbot: ${r.dead >= 0 ? 'nie żyje' : r.state} · ${r.ammo}/${MAG} naboi` : '');
+    },
+    // multiplayer (js/mp.js)
+    ai() { return this.isBot() ? { shots: this.rivalShots, netExport: () => this.netExport(), netImport: d => this.netImport(d), netDamage: (s, d) => this.netDamage(s, d) } : null; },
+    playerPoints() { const p = this.player.pos; return { eye: p, body: [p, [p[0], p[1] - 0.8, p[2]], [p[0], p[1] - 1.3, p[2]]] }; },
+    mp: {
+      space: WSwarm.spaces.torus([1e9, 1e9, 1e9]),
+      me() { const pl = world.player, f = pl.forward; return { p: world.feet(), yaw: Math.atan2(f[0], f[2]) }; },
+      respawn() { world.respawnMe(); },
     },
     _test: { sdf, groundAt, los, NODES, ADJ, buildNav, nearestNode, dijkstra, pathTo, crossPortal, PORTALS },
   };

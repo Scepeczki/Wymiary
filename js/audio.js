@@ -27,6 +27,20 @@
     if (e.code === 'KeyV' && !e.repeat) { A.enabled = !A.enabled; WE.toast(A.enabled ? 'Dźwięk: WŁ' : 'Dźwięk: WYŁ'); }
   });
 
+  // short metallic click of the pistol mechanism (magazine out / in, slide) — heard directly, no propagation
+  A.click = function (pitch = 1) {
+    const ctx = A.ctx;
+    if (!ctx || !A.enabled) return;
+    const sr = ctx.sampleRate, n = Math.floor(sr * 0.06), b = ctx.createBuffer(1, n, sr), d = b.getChannelData(0);
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      d[i] = noise() * Math.exp(-t / 0.004) * 0.6 + Math.sin(2 * Math.PI * 2100 * pitch * t) * Math.exp(-t / 0.012) * 0.35;
+    }
+    const s = ctx.createBufferSource(), g = ctx.createGain();
+    s.buffer = b; g.gain.value = 0.45;
+    s.connect(g); g.connect(A.master); s.start();
+  };
+
   // ---------------- synthesis ----------------
   const noise = () => Math.random() * 2 - 1;
   function makeShot(ctx) {

@@ -1,8 +1,11 @@
 // Monsters ("zombies") for the corridor building. Each one carries a bubble of curved space with it
 // (type 0: K > 0, a lens; type 1: K < 0, a hyperbolic bubble) and shoots slow projectiles that are small
 // flying lenses themselves. All of it feeds the metric, so light, bullets and sound bend around them.
+// Multiplayer (js/mp.js): the room's leader runs them and sends snapshots; the other players draw them
+// interpolated and report their hits. They target the nearest living player. Other players are drawn in the
+// slots after the monsters (CAP).
 (function () {
-  const MAX = 8, HP = 100;
+  const N = 8, MAX = N + 3, HP = 100;   // N monsters at most; MAX = shader slots (monsters + 3 other players)
   const SEG0 = 0.25, SEG1 = 1.65, BODY_R = 0.42;   // hit capsule (above the feet)
   // curvature bubbles: [K, R, R2]
   const BUBBLE = [[0.9, 0.9, 2.1], [-0.6, 0.9, 2.1]];
@@ -18,11 +21,12 @@
     }
     reset(on) {
       this.list = []; this.shots.clear(); this.killed = 0;
-      if (on) this.o.spawns.slice(0, MAX).forEach(([x, z], i) => this.list.push({
+      if (on && WMP.isLeader(this.w)) this.o.spawns.slice(0, N).forEach(([x, z], i) => this.list.push({
         slot: i, p: [x, 0, z], yaw: 0, hp: HP, type: i % 2, cool: 2.5 + Math.random() * 2, flash: 0, dead: -1, ph: Math.random() * 6,
       }));
       this.total = this.list.length;
     }
+    monster(slot) { return { slot, p: [0, 0, 0], yaw: 0, hp: HP, type: slot % 2, cool: 3, flash: 0, dead: -1, ph: Math.random() * 6 }; }
     alive() { return this.list.filter(m => m.dead < 0).length; }
 
     // curvature sources for the metric: [x, y, z, K, R, R2]
@@ -43,24 +47,63 @@
     hitTest(q) {
       for (const m of this.list) {
         if (m.dead >= 0 || capsuleDist(q, m.p[0], m.p[2], SEG0, SEG1) > BODY_R) continue;
-        m.hp -= 34; m.flash = 1;
-        if (m.hp <= 0) {
-          m.dead = 0; this.killed++;
-          WAudio.at(this.w, [m.p[0], 1.2, m.p[2]], 'death');
-          if (!this.alive()) WE.toast('Wszystkie potwory pokonane!', 3500);
-        }
+        m.flash = 1;
+        if (WMP.isLeader(this.w)) this.damageMonster(m, 34);
+        else WMP.aiHit(this.w, m.slot, 34);
         return true;
       }
       return false;
     }
+    netDamage(slot, dmg) { const m = this.list.find(x => x.slot === slot && x.dead < 0); if (m) { m.flash = 1; this.damageMonster(m, dmg); } }
+    damageMonster(m, dmg) {
+      m.hp -= dmg;
+      if (m.hp > 0) return;
+      m.dead = 0; this.killed++;
+      WAudio.at(this.w, [m.p[0], 1.2, m.p[2]], 'death');
+      if (!this.alive()) WE.toast('Wszystkie potwory pokonane!', 3500);
+    }
+    // not the leader: the leader's monsters, interpolated between snapshots; their shots fly visually
+    follow(dt) {
+      const now = performance.now() / 1000;
+      for (const m of this.list) {
+        m.flash = Math.max(0, m.flash - dt * 4);
+        if (m.dead >= 0) m.dead += dt;
+        if (m.next) {
+          const f = WM.clamp((now - m.tA) / Math.max(0.03, m.tA - m.tP), 0, 1), a = m.prev, b = m.next;
+          let dy = b[3] - a[3]; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+          m.p = [a[0] + (b[0] - a[0]) * f, 0, a[2] + (b[2] - a[2]) * f]; m.yaw = a[3] + dy * f;
+        }
+      }
+      this.shots.update(dt);
+    }
+    netExport() { return { killed: this.killed, total: this.total, list: this.list.map(m => ({ s: m.slot, g: [m.p[0], 0, m.p[2], m.yaw], hp: m.hp, d: m.dead, ty: m.type })) }; }
+    netImport(d) {
+      const now = performance.now() / 1000, old = new Map(this.list.map(m => [m.slot, m]));
+      this.killed = d.killed; this.total = d.total;
+      this.list = d.list.map(x => {
+        let m = old.get(x.s);
+        if (!m) { m = this.monster(x.s); m.p = [x.g[0], 0, x.g[2]]; m.yaw = x.g[3]; m.prev = x.g; }
+        else m.prev = [m.p[0], 0, m.p[2], m.yaw];
+        m.next = x.g; m.tP = m.tA || now - 0.08; m.tA = now;
+        if (x.hp < m.hp) m.flash = 1;
+        m.hp = x.hp; m.type = x.ty;
+        if (x.d >= 0 && m.dead < 0) { m.dead = x.d; WAudio.at(this.w, [m.p[0], 1.2, m.p[2]], 'death'); }
+        return m;
+      });
+    }
 
     update(dt) {
-      const o = this.o, pl = this.w.player, eye = pl.pos;
-      const pNode = o.nearestNode(eye);
+      if (!WMP.isLeader(this.w)) return this.follow(dt);
+      const o = this.o, targets = WMP.targets(this.w);
       for (const m of this.list) {
         m.flash = Math.max(0, m.flash - dt * 4);
         if (m.dead >= 0) { m.dead += dt; continue; }
         const head = [m.p[0], 1.6, m.p[2]];
+        // the nearest living player
+        let eye = null, bd = Infinity;
+        for (const t of targets) { const d = WM.len(WM.sub(t.eye, head)); if (d < bd) { bd = d; eye = t.eye; } }
+        if (!eye) continue;
+        const pNode = o.nearestNode(eye);
         const dist = WM.len(WM.sub(eye, head));
         const los = dist < 26 && o.los(head, eye);
         const mNode = o.nearestNode(m.p);
@@ -92,7 +135,9 @@
           m.cool = 1.4 + Math.random() * 1.6;
           let dir = WM.norm(WM.sub(eye, head));
           dir = WM.norm(WM.add(dir, [0, 1, 2].map(() => (Math.random() - 0.5) * 0.08)));
-          this.shots.fire({ pos: WM.addScaled(head, dir, 0.3), dir });
+          const aim = { pos: WM.addScaled(head, dir, 0.3), dir };
+          this.shots.fire(aim);
+          WMP.aiShot(this.w, aim);
           WAudio.at(this.w, head, 'enemy');
         }
       }
@@ -108,22 +153,23 @@
       for (const b of this.shots.list) {
         if (b.dead >= 0) continue;
         const q = this.shots.model.pos(b.s);
-        if (capsuleDist(q, eye[0], eye[2], eye[1] - 1.5, eye[1]) < 0.4) { b.dead = 0; this.w.damage(8); }
+        const t = targets.find(t => capsuleDist(q, t.eye[0], t.eye[2], t.eye[1] - 1.5, t.eye[1]) < 0.4);
+        if (t) { b.dead = 0; WMP.hurt(this.w, t, 8); }
       }
     }
 
     setUniforms(gl, p) {
       const a = new Float32Array(MAX * 4), s = new Float32Array(MAX * 4);
-      this.list.slice(0, MAX).forEach((m, i) => {
-        a.set([m.p[0], m.p[1], m.p[2], m.yaw], i * 4);
-        s.set([m.hp / HP, m.flash, m.dead, m.type], i * 4);
-      });
+      const figs = this.list.slice(0, N).map(m => [[m.p[0], m.p[1], m.p[2], m.yaw], [m.hp / HP, m.flash, m.dead, m.type]]);
+      for (const o of WMP.avatars(this.w)) if (figs.length < MAX) figs.push([[o.g.p[0], o.g.p[1], o.g.p[2], o.g.yaw], [o.hp / 100, o.flash, o.dead, o.type]]);
+      figs.forEach(([pos, st], i) => { a.set(pos, i * 4); s.set(st, i * 4); });
       gl.uniform4fv(p.u('uMon'), a);
       gl.uniform4fv(p.u('uMonS'), s);
-      gl.uniform1i(p.u('uMonN'), Math.min(MAX, this.list.length));
+      gl.uniform1i(p.u('uMonN'), figs.length);
     }
   }
   Horde.MAX = MAX;
+  Horde.N = N;
   // Shared GLSL: blocky humanoid (feet at the origin, facing +z) and its colours.
   // st = (hp 0..1, hit flash, death time or -1, type: 0 orange zombie, 1 blue zombie, 2 the player, 3 the rival)
   Horde.GLSL = `

@@ -4,34 +4,55 @@
 (function () {
   const MAX = WG.MAX_BULLETS, SUBSTEPS = 3;
 
+  // The pistol: a 12-round magazine on every map. R (or an empty magazine) reloads: the gun dips and rolls,
+  // the old magazine drops out of the grip and a new one slides in (drawn by the kernels, see glsl.js).
+  const MAG = 12, RELOAD = 1.5;
   class Gun {
-    constructor() { this.kick = 0; this.flash = 0; this.cool = 0; }
+    constructor() { this.kick = 0; this.flash = 0; this.cool = 0; this.ammo = MAG; this.reloadT = 0; }
     update(dt) {
       this.kick = Math.max(0, this.kick - dt * 5);
       this.flash = Math.max(0, this.flash - dt * 16);
       this.cool -= dt;
+      if (this.reloadT > 0) {
+        const before = this.reloadT;
+        this.reloadT -= dt;
+        if (before > RELOAD * 0.3 && this.reloadT <= RELOAD * 0.3 && window.WAudio) WAudio.click(0.9);   // new magazine in
+        if (this.reloadT <= 0) { this.reloadT = 0; this.ammo = MAG; if (window.WAudio) WAudio.click(1.6); }
+      }
     }
     tryFire() {
-      if (this.cool > 0) return false;
-      this.cool = 0.16; this.kick = 1; this.flash = 1;
+      if (this.cool > 0 || this.reloadT > 0) return false;
+      if (this.ammo <= 0) { this.reload(); return false; }
+      this.cool = 0.16; this.kick = 1; this.flash = 1; this.ammo--;
+      if (this.ammo === 0) this.reload();
       return true;
     }
+    reload() {
+      if (this.reloadT > 0 || this.ammo >= MAG) return;
+      this.reloadT = RELOAD;
+      if (window.WAudio) WAudio.click(0.6);                    // magazine release
+    }
+    refill() { this.ammo = MAG; this.reloadT = 0; }
+    get reloading() { return this.reloadT > 0; }
+    get phase() { return this.reloadT > 0 ? 1 - this.reloadT / RELOAD : 0; }
     setUniforms(gl, p, show) {
       gl.uniform1f(p.u('uGunKick'), this.kick * (2 - this.kick) * 0.9);
       gl.uniform1f(p.u('uGunFlash'), this.flash);
       gl.uniform1f(p.u('uGunShow'), show ? 1 : 0);
+      gl.uniform1f(p.u('uGunReload'), this.phase);
     }
   }
+  Gun.MAG = MAG;
 
   // ---- ballistic models: spawn(aim) -> state; step(state, dt); pos(state) -> array (3 or 4 numbers) ----
   const B = {};
 
   // Flat N-dimensional space (axis 1 = up), optional periodic wrap.
   B.flat = (n, o = {}) => ({
-    radius: o.radius || 0.06, life: o.life || 5, hitScale: 1, gravity: o.gravity == null ? 6 : o.gravity,
-    spawn(aim) { return { p: WM.addScaled(aim.pos, aim.dir, 0.35), v: WM.scale(aim.dir, o.speed || 32) }; },
+    radius: o.radius || 0.06, life: o.life || 4, hitScale: 1, gravity: o.gravity == null ? 1.2 : o.gravity,
+    spawn(aim) { return { p: WM.addScaled(aim.pos, aim.dir, 0.35), v: WM.scale(aim.dir, o.speed || 55) }; },
     step(s, dt) {
-      s.v[1] -= (o.gravity == null ? 6 : o.gravity) * dt;
+      s.v[1] -= (o.gravity == null ? 1.2 : o.gravity) * dt;
       const prev = s.p;
       s.p = WM.addScaled(s.p, s.v, dt);
       // seamless portals: cross(a, b) returns the offset of a portal crossed between a and b

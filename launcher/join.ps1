@@ -55,7 +55,7 @@ elseif ($NoLaunch) { Write-Output "Aktualna wersja: $($m.version)" }
 if ($NoLaunch) { exit 0 }
 
 # ---- launch the game from the host (same version for everybody) ----
-$url = "$base/?w=7&mode=3"
+$url = "$base/"
 $cands = @(
   "$env:ProgramFiles\BraveSoftware\Brave-Browser\Application\brave.exe", "$env:LOCALAPPDATA\BraveSoftware\Brave-Browser\Application\brave.exe",
   "$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe", "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe",

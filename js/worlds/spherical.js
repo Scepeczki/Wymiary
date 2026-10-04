@@ -64,8 +64,8 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
     tags: ['K = +1', 'S³', 'potwory'],
     help: ['WASD ruch · Spacja skok', 'strzel prosto — pocisk okrąży świat i trafi Cię w plecy', 'podłoga: 6 kolorowych pokoi', 'idź prosto wzdłuż kolorowych bloków', 'walka: chybiony pocisk potwora okrąża świat — uważaj na plecy', 'N noclip (Spacja/Ctrl — wysokość)'],
     shader: () => WG.curved(K, code, '#define MAX_T 6.\n#define FOG_DENS .16\n'),
-    bullets: new WBullets(WBallistics.curved(K, { speed: 1.2, gravity: 0, radius: 0.006, life: 7 }), {
-      hitTest: q => swarm.hitTest(q),
+    bullets: new WBullets(WBallistics.curved(K, { speed: 3.5, gravity: 0, radius: 0.006, life: 4 }), {
+      hitTest: q => swarm.hitTest(q) || WMP.hitPeers(q),
       selfDist: b => Math.acos(WM.clamp(WM.dot(b, world.player.camera()[3]), -1, 1)) - 0.03,
     }),
     aim() { return this.player.aim(); },
@@ -85,7 +85,7 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
       swarm.update(dt);
     },
     setUniforms(gl, prog) { this.player.setUniforms(gl, prog); swarm.setUniforms(gl, prog); },
-    setBulletUniforms(gl, p) { WBullets.uploadSigned(gl, p, [[this.bullets, false], [swarm.shots, true]]); },
+    setBulletUniforms(gl, p) { WBullets.uploadSigned(gl, p, [[this.bullets, false], [swarm.shots, true], ...WMP.extraBullets(this)]); },
     // monsters appear on the floor plane around you, facing you
     spawn(i, wave) {
       const r = 1.0 + Math.random() * 1.6;
@@ -107,5 +107,11 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
   const swarm = new WSwarm(world, WSwarm.spaces.curved(K, EN_M), {
     range: 28, shotModel: WBallistics.curved(K, { speed: 9 * EN_M, gravity: 0, radius: 0.009, life: 9 }),
   });
+  // multiplayer: you are a figure with a whole frame at your feet (S³ has one global chart: no conversion)
+  world.mp = {
+    space: swarm.sp,
+    me: () => ({ M: world.player.M.map(c => c.slice()) }),
+    respawn() { world.player.reset(); world.player.move((Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4); },
+  };
   WE.register(world);
 })();

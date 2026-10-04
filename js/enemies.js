@@ -5,8 +5,12 @@
 // A "space" adapter hides the geometry. Each monster keeps its own frame (right, up, forward [, ana]) at its feet;
 // the AI works only with LOCAL coordinates in metres (x right, y up, z forward, a = ana in 4D), which the adapter
 // computes exactly (log map in curved space). Obstacles and line of sight use the GPU distance probes.
+// The same adapters draw the other players (js/mp.js) and turn geometries into plain number arrays for the network
+// (encode / decode / lerpArr).
+// Multiplayer: the leader of a room (js/mp.js) runs the monsters and sends snapshots; the others draw them
+// interpolated and send their hits to the leader. Monsters target the nearest living player.
 (function () {
-  const MAX = 8, HP = 100;
+  const MAX = 8, CAP = MAX + 3, HP = 100;   // CAP: shader slots = monsters + other players
   const SEG0 = 0.25, SEG1 = 1.65, BODY_R = 0.42, HALF_ANA = 0.35;   // hit capsule above the feet (metres)
   const add = (a, b) => a.map((x, i) => x + b[i]), sub = (a, b) => a.map((x, i) => x - b[i]);
   const sc = (a, s) => a.map(x => x * s), dot = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
@@ -31,6 +35,14 @@
     lerp(a, b, t) { return add(a, sc(this.wrapD(sub(b, a)), t)); },
     aim(from, to, jit) { return { pos: from, dir: nrm(add(nrm(this.wrapD(sub(to, from))), [0, 1, 2].map(() => (Math.random() - 0.5) * jit))) }; },
     pack(g, i, buf) { buf.pos.set([g.p[0], g.p[1], g.p[2], g.yaw], i * 4); },
+    encode: g => [g.p[0], g.p[1], g.p[2], g.yaw],
+    decode: a => ({ p: a.slice(0, 3), yaw: a[3] }),
+    lerpArr(a, b, f) {
+      const d = this.wrapD(sub(b.slice(0, 3), a.slice(0, 3)));
+      if (len(d) > 3) return (f < 0.5 ? a : b).slice();         // teleport / wrap: do not slide across the map
+      let dy = b[3] - a[3]; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      return [...add(a.slice(0, 3), sc(d, f)), a[3] + dy * f];
+    },
   });
 
   // ---- flat 4D. Monster: feet p (y = 0) and a horizontal frame R, F, A in (x, z, w). ----
@@ -66,6 +78,9 @@
     lerp: (a, b, t) => add(a, sc(sub(b, a), t)),
     aim: (from, to, jit) => ({ pos: from, dir: nrm(add(nrm(sub(to, from)), [0, 1, 2, 3].map(() => (Math.random() - 0.5) * jit))) }),
     pack(g, i, buf) { buf.mat.set([...g.R, 0, 1, 0, 0, ...g.F, ...g.p], i * 16); buf.ana.set(g.A, i * 4); },
+    encode: g => [...g.p, ...g.R, ...g.F, ...g.A],
+    decode(a) { const g = { p: a.slice(0, 4), R: a.slice(4, 8), F: a.slice(8, 12), A: a.slice(12, 16) }; this.ortho(g); return g; },
+    lerpArr: (a, b, f) => (len(sub(b.slice(0, 4), a.slice(0, 4))) > 3 ? (f < 0.5 ? a : b).slice() : a.map((x, i) => x + (b[i] - x) * f)),
   });
 
   // ---- constant curvature K (S³ / H³). Monster: frame columns [R, U, F, P] (P on the floor plane y = 0). ----
@@ -89,7 +104,7 @@
       walk(g, v) {
         const [R, U, F, P] = g.M, s = Math.hypot(v[0], v[1]) * m;
         if (s < 1e-9) return;
-        const T = nrm(add(sc(R, v[0]), sc(F, v[1]))), T2 = add(sc(P, -K * Sn(s)), sc(T, C(s)));
+        const T = sc(add(sc(R, v[0]), sc(F, v[1])), m / s), T2 = add(sc(P, -K * Sn(s)), sc(T, C(s)));
         const tr = e => { const a = kd(e, T); return add(sub(e, sc(T, a)), sc(T2, a)); };
         g.M = [tr(R), U, tr(F), along(P, T, s)];
         WM.korthonormalize(K, g.M);
@@ -107,11 +122,21 @@
       },
       transform(g, f) { g.M = g.M.map(f); },
       pack(g, i, buf) { buf.mat.set(g.M.flat(), i * 16); },
+      encode: g => g.M.flat(),
+      decode(a) { const M = [0, 1, 2, 3].map(c => a.slice(c * 4, c * 4 + 4)); WM.korthonormalize(K, M); return { M }; },
+      lerpArr: (a, b, f) => a.map((x, i) => x + (b[i] - x) * f),
     };
   };
 
+  // is q inside the body (capsule above the feet, thickness along ana in 4D) of a figure with geometry g?
+  const inBody = (sp, g, q) => {
+    if (sp.dist(q, g.p || g.M[3]) / sp.m > 2.6) return false;
+    const l = sp.rel(g, q);
+    return Math.hypot(l[0], l[1] - WM.clamp(l[1], SEG0, SEG1), l[2]) <= BODY_R && Math.abs(l[3]) <= HALF_ANA;
+  };
+
   class Swarm {
-    // world: { player, damage(n), playerPoints() -> { eye, body: [points] }, spawn(i, wave) -> geometry (space.place) }
+    // world: { player, damage(n), spawn(i, wave) -> geometry (space.place), mp (see js/mp.js) }
     // o: { range (m), shotModel (WBallistics…), avoid(g) -> local push [x, z] (optional, CPU-only obstacles) }
     constructor(world, space, o = {}) {
       this.w = world; this.sp = space; this.o = Object.assign({ range: 26 }, o);
@@ -122,51 +147,63 @@
     // start (or restart) the game from wave 1; on = false: no monsters (exploring)
     start(on) {
       this.on = on; this.list = []; this.shots.clear(); this.wave = 0; this.kills = 0; this.nextT = -1;
-      if (on) this.nextWave();
+      if (on && WMP.isLeader(this.w)) this.nextWave();
     }
     nextWave() {
       this.wave++;
-      const n = Math.min(MAX, 1 + this.wave);
+      const n = Math.min(MAX, 1 + this.wave + Math.max(0, WMP.roomPeers(this.w).length * 2 - 1));   // more players, more monsters
       this.list = [];
-      for (let i = 0; i < n; i++) this.list.push({
-        slot: i, g: this.w.spawn(i, this.wave), hp: HP, type: i % 2, cool: 2.5 + Math.random() * 2.5,
-        flash: 0, dead: -1, ph: Math.random() * 6, los: false, push: null, alert: false,
-      });
+      for (let i = 0; i < n; i++) this.list.push(this.monster(i, this.w.spawn(i, this.wave)));
       this.total = n;
-      WE.toast(this.wave === 1 ? `Fala 1 — potwory: ${n}` : `Fala ${this.wave} — potwory: ${n}`, 2500);
+      WE.toast(`Fala ${this.wave} — potwory: ${n}`, 2500);
+    }
+    monster(slot, g) {
+      return { slot, g, hp: HP, type: slot % 2, cool: 2.5 + Math.random() * 2.5, flash: 0, dead: -1, ph: Math.random() * 6, los: false, push: null, alert: false };
     }
     alive() { return this.list.filter(m => m.dead < 0).length; }
 
+    // a player bullet at q (yours): the leader applies the damage, the others tell the leader
     hitTest(q) {
-      const sp = this.sp;
       for (const m of this.list) {
-        if (m.dead >= 0 || sp.dist(q, m.g.p || m.g.M[3]) / sp.m > 2.6) continue;
-        const l = sp.rel(m.g, q);
-        if (Math.hypot(l[0], l[1] - WM.clamp(l[1], SEG0, SEG1), l[2]) > BODY_R || Math.abs(l[3]) > HALF_ANA) continue;
-        m.hp -= 34; m.flash = 1; m.alert = true;
-        if (m.hp <= 0) {
-          m.dead = 0; this.kills++;
-          WAudio.at(this.w, sp.point(m.g, [0, 1.2, 0, 0]), 'death');
-          if (!this.alive()) { WE.toast(`Fala ${this.wave} pokonana!`, 2500); this.nextT = 3.5; this.best = Math.max(this.best, this.wave); }
-        }
+        if (m.dead >= 0 || !inBody(this.sp, m.g, q)) continue;
+        m.flash = 1;
+        if (WMP.isLeader(this.w)) this.damageMonster(m, 34);
+        else WMP.aiHit(this.w, m.slot, 34);
         return true;
       }
       return false;
     }
+    netDamage(slot, dmg) { const m = this.list.find(x => x.slot === slot && x.dead < 0); if (m) { m.flash = 1; this.damageMonster(m, dmg); } }
+    damageMonster(m, dmg) {
+      m.hp -= dmg; m.alert = true;
+      if (m.hp > 0) return;
+      m.dead = 0; this.kills++;
+      WAudio.at(this.w, this.sp.point(m.g, [0, 1.2, 0, 0]), 'death');
+      if (!this.alive()) { WE.toast(`Fala ${this.wave} pokonana!`, 2500); this.nextT = 3.5; this.best = Math.max(this.best, this.wave); }
+    }
 
     update(dt) {
       if (!this.on) return;
-      const sp = this.sp, W = this.w, pp = W.playerPoints(), eye = pp.eye, hard = 1 + 0.07 * (this.wave - 1);
+      if (!WMP.isLeader(this.w)) return this.follow(dt);
+      const sp = this.sp, W = this.w, hard = 1 + 0.07 * (this.wave - 1);
+      const targets = WMP.targets(W);
       if (this.nextT > 0 && (this.nextT -= dt) <= 0) this.nextWave();
       const live = this.list.filter(m => m.dead < 0);
       for (const m of this.list) { m.flash = Math.max(0, m.flash - dt * 4); if (m.dead >= 0) m.dead += dt; }
 
       for (const m of live) {
+        // the nearest living player
+        let tg = null, l = null, d = Infinity;
+        for (const t of targets) {
+          const lt = sp.rel(m.g, t.eye), dd = Math.hypot(lt[0], lt[2], lt[3]);
+          if (dd < d) { d = dd; l = lt; tg = t; }
+        }
+        m.tg = tg;
+        if (!tg) continue;
         const head = sp.point(m.g, [0, 1.6, 0, 0]);
-        const l = sp.rel(m.g, eye), d = Math.hypot(l[0], l[2], l[3]);
         const seen = m.los && d < this.o.range;
         if (seen) m.alert = true;
-        let v = [0, 0, 0];
+        let v;
         if (m.alert && d < this.o.range * 1.4) {
           // face the player, keep a fighting distance and strafe (in 4D partly through W)
           sp.turn(m.g, l, Math.min(1, dt * 5));
@@ -179,14 +216,15 @@
           v = [0, 0.6, 0];
         }
         if (m.push) v = add(v, m.push);
-        const spd = 2.3 * hard * dt;
-        sp.walk(m.g, sc(v, spd));
+        sp.walk(m.g, sc(v, 2.3 * hard * dt));
         if (this.o.avoid) { const a = this.o.avoid(m.g); if (a) sp.walk(m.g, a); }
         // shoot
         m.cool -= dt;
         if (seen && m.cool <= 0 && d > 1.5) {
           m.cool = (1.8 + Math.random() * 1.8) / hard;
-          this.shots.fire(sp.aim(head, eye, 0.12 / Math.sqrt(hard)));
+          const aim = sp.aim(head, tg.eye, 0.12 / Math.sqrt(hard));
+          this.shots.fire(aim);
+          WMP.aiShot(W, aim);
           WAudio.at(W, head, 'enemy');
         }
       }
@@ -209,9 +247,9 @@
       const los = [];
       for (let k = 0; k < 2 && live.length; k++) {
         const m = live[(this.losTurn++) % live.length];
-        if (los.some(x => x.m === m)) continue;
+        if (!m.tg || los.some(x => x.m === m)) continue;
         const head = sp.point(m.g, [0, 1.6, 0, 0]), o = pts.length;
-        for (let i = 1; i <= 7; i++) pts.push(sp.lerp(head, eye, i / 8));
+        for (let i = 1; i <= 7; i++) pts.push(sp.lerp(head, m.tg.eye, i / 8));
         los.push({ m, o });
       }
       if (pts.length) {
@@ -225,26 +263,62 @@
         for (const { m, o } of los) m.los = [1, 2, 3, 4, 5, 6, 7].every(i => !(d[o + i - 1] < 0.03));
       }
 
-      // enemy projectiles
+      // enemy projectiles: every living player can be hit (the leader decides, see js/mp.js)
       this.shots.update(dt);
       for (const b of this.shots.list) {
         if (b.dead >= 0) continue;
         const q = this.shots.model.pos(b.s);
-        if (pp.body.some(p => sp.dist(q, p) / sp.m < 0.42)) { b.dead = 0; W.damage(7); }
+        const t = targets.find(t => t.body.some(p => sp.dist(q, p) / sp.m < 0.42));
+        if (t) { b.dead = 0; WMP.hurt(W, t, 7); }
       }
     }
+    // not the leader: draw the leader's monsters, interpolated between its snapshots; their shots fly visually
+    follow(dt) {
+      const now = performance.now() / 1000;
+      for (const m of this.list) {
+        m.flash = Math.max(0, m.flash - dt * 4);
+        if (m.dead >= 0) m.dead += dt;
+        if (m.next) m.g = this.sp.decode(this.sp.lerpArr(m.prev, m.next, WM.clamp((now - m.tA) / Math.max(0.03, m.tA - m.tP), 0, 1)));
+      }
+      this.shots.update(dt);
+    }
+    // snapshot for the other players (geometries in the room's shared coordinates, see WMP.xf)
+    netExport(xf) {
+      return { on: this.on, wave: this.wave, total: this.total, kills: this.kills, nextT: this.nextT, best: this.best,
+        list: this.list.map(m => ({ s: m.slot, g: xf(this.sp.encode(m.g)), hp: m.hp, d: m.dead, ty: m.type })) };
+    }
+    netImport(d, xf) {
+      const now = performance.now() / 1000;
+      if (d.wave !== this.wave && d.wave > 0) WE.toast(`Fala ${d.wave} — potwory: ${d.total}`, 2500);
+      Object.assign(this, { on: d.on, wave: d.wave, total: d.total, kills: d.kills, nextT: d.nextT, best: Math.max(this.best, d.best || 0) });
+      const old = new Map(this.list.map(m => [m.slot, m]));
+      this.list = d.list.map(x => {
+        const arr = xf(x.g);
+        let m = old.get(x.s);
+        if (!m) { m = this.monster(x.s, this.sp.decode(arr)); m.prev = arr; }
+        else m.prev = m.next ? this.sp.lerpArr(m.prev, m.next, WM.clamp((now - m.tA) / Math.max(0.03, m.tA - m.tP), 0, 1)) : arr;
+        m.next = arr; m.tP = m.tA || now - 0.08; m.tA = now;
+        if (x.hp < m.hp) m.flash = 1;
+        m.hp = x.hp; m.type = x.ty;
+        if (x.d >= 0 && m.dead < 0) { m.dead = x.d; WAudio.at(this.w, this.sp.point(m.g, [0, 1.2, 0, 0]), 'death'); }
+        return m;
+      });
+    }
 
-    // GLSL data: 'mat' spaces -> uEn (mat4: right, up, forward, feet), uEnA (ana, 4D); 'yaw' -> uEn4 (feet, yaw)
+    // GLSL data: 'mat' spaces -> uEn (mat4: right, up, forward, feet), uEnA (ana, 4D); 'yaw' -> uEn4 (feet, yaw).
+    // After the monsters: the other players in this room (type 2 = team mate, 3 = opponent).
     setUniforms(gl, p) {
-      const n = Math.min(MAX, this.list.length), st = new Float32Array(MAX * 4);
-      const buf = { mat: new Float32Array(MAX * 16), ana: new Float32Array(MAX * 4), pos: new Float32Array(MAX * 4) };
-      this.list.slice(0, MAX).forEach((m, i) => { this.sp.pack(m.g, i, buf); st.set([m.hp / HP, m.flash, m.dead, m.type], i * 4); });
+      const figs = this.list.slice(0, MAX).map(m => ({ g: m.g, st: [m.hp / HP, m.flash, m.dead, m.type] }));
+      for (const a of WMP.avatars(this.w)) if (figs.length < CAP) figs.push({ g: a.g, st: [a.hp / 100, a.flash, a.dead, a.type] });
+      const st = new Float32Array(CAP * 4);
+      const buf = { mat: new Float32Array(CAP * 16), ana: new Float32Array(CAP * 4), pos: new Float32Array(CAP * 4) };
+      figs.forEach((f, i) => { this.sp.pack(f.g, i, buf); st.set(f.st, i * 4); });
       if (this.sp.kind === 'mat') {
         gl.uniformMatrix4fv(p.u('uEn'), false, buf.mat);
         if (this.sp.ana) gl.uniform4fv(p.u('uEnA'), buf.ana);
       } else gl.uniform4fv(p.u('uEn4'), buf.pos);
       gl.uniform4fv(p.u('uEnS'), st);
-      gl.uniform1i(p.u('uEnN'), this.on ? n : 0);
+      gl.uniform1i(p.u('uEnN'), figs.length);
     }
     // in the HUD at the top (same place as the duel score on the loop arena)
     hud() {
@@ -254,17 +328,23 @@
     }
   }
   Swarm.MAX = MAX;
+  Swarm.CAP = CAP;
   Swarm.spaces = S;
+  Swarm.inBody = inBody;
   Swarm.MODES = [{ label: 'Zwiedzanie', opts: { fight: false } }, { label: 'Walka: fale potworów', opts: { fight: true } }];
   // the map's game modes, health and HUD (the world calls startMode from its enter(opts))
   Swarm.attach = (world, swarm) => {
     world.modes = Swarm.MODES;
     world.swarm = swarm;
-    world.damage = function (n) {
-      if (this.health == null) return;
+    world.ai = () => (world.fight ? swarm : null);
+    world.damage = function (n, from) {
+      if (this.health == null || WMP.dead()) return;
       this.health = Math.max(0, this.health - n);
       WE.hurt();
-      if (this.health <= 0) WE.toast(`Zginąłeś na fali ${swarm.wave}! Gra od nowa.`, 3000), this.enter({});
+      if (this.health > 0) return;
+      if (WMP.died(this, from)) return;                  // with other players: respawn, the game goes on
+      WE.toast(`Zginąłeś na fali ${swarm.wave}! Gra od nowa.`, 3000);
+      this.enter({});
     };
     world.duelHud = () => swarm.hud();
   };
@@ -278,8 +358,8 @@
   // GLSL for 'mat' spaces (4D and curved). edot/edist = the space's inner product and distance; EN_M = units/metre.
   // Adds: vec2 enemies(vec4 x) -> (distance, id 20 + 4 i + part) and vec3 enemyColor(float id, vec4 p, vec4 n, inout float emit).
   Swarm.glslMat = (curved, unitsPerMetre, ana) => `
-uniform mat4 uEn[${MAX}];
-uniform vec4 uEnA[${MAX}], uEnS[${MAX}];
+uniform mat4 uEn[${CAP}];
+uniform vec4 uEnA[${CAP}], uEnS[${CAP}];
 uniform int uEnN;
 const float EN_M = ${unitsPerMetre.toFixed(6)};
 ${curved ? 'float edot(vec4 a, vec4 b){ return kdot(a,b); }\nfloat edist(vec4 a, vec4 b){ return kdist(a,b); }'
@@ -299,7 +379,7 @@ vec4 enLocal(vec4 x, int i){
 }
 vec2 enemies(vec4 x){
   vec2 r = vec2(1e9, 0.);
-  for (int i = uZero; i < ${MAX}; i++){
+  for (int i = uZero; i < ${CAP}; i++){
     if (i >= uEnN) break;
     float far = edist(x, uEn[i][3])/EN_M - 2.3;
     if (far > .4) { r.x = min(r.x, far*EN_M); continue; }

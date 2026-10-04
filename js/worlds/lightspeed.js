@@ -196,23 +196,24 @@ vec3 light(vec3 p, vec3 n, vec3 rd, vec3 alb, float ao){
     tags: ['wolne światło', 'lustro', 'potwory'],
     help: ['WASD ruch · Shift bieg', 'Q / E — prędkość światła c', 'lustrzane ściany po bokach: odbicie się spóźnia', 'L — wszystkie lampy · F — lampa na celowniku', 'strzał w żarówkę też ją przełącza', 'B aberracja · J Doppler (efekty ruchu, domyślnie wył.)', 'K opóźnienie światła'],
     shader: () => WG.euclid(code, '#define CUSTOM_LIGHT\n#define RELATIVITY\n#define RETARDED\n#define MIRROR\n#define RETARD_HOOK\n#define FOG_DENS .004\n#define MAX_T 150.\n'),
-    bullets: new WBullets(WBallistics.flat(3, { speed: 32 }), {
+    bullets: new WBullets(WBallistics.flat(3, { speed: 55, gravity: 1.2, life: 4 }), {
       linger,
       hitTest: q => {
         const l = LAMPS.find(l => WM.len(WM.sub(q, l.p)) < 0.45);
         if (l) { toggle(l); return true; }
-        return horde.hitTest(q);
+        return horde.hitTest(q) || WMP.hitPeers(q);
       },
     }),
     aim() { return this.player.aim(); },
     reverb: 0.2,
     horde,
     modes: [{ label: 'Spokój', opts: { zombies: false } }, { label: 'Z potworami', opts: { zombies: true } }],
-    damage(n) {
-      if (this.health == null) return;
+    damage(n, from) {
+      if (this.health == null || WMP.dead()) return;
       this.health = Math.max(0, this.health - n);
       WE.hurt();
-      if (this.health <= 0) { WE.toast('Zginąłeś! Potwory wracają.', 3000); this.enter({}); this.bullets.clear(); }
+      if (this.health > 0 || WMP.died(this, from)) return;
+      WE.toast('Zginąłeś! Potwory wracają.', 3000); this.enter({}); this.bullets.clear();
     },
     settings: [
       { label: 'Prędkość światła', min: 0, max: 1, step: 0.005, reset: 0.43, get: () => S.s, set: v => { S.s = v; }, text: () => `c = ${c().toFixed(c() < 10 ? 1 : 0)} m/s` },
@@ -265,6 +266,8 @@ vec3 light(vec3 p, vec3 n, vec3 rd, vec3 alb, float ao){
       histNow(0, [pos[0], pos[1] - WPlayer.EYE, pos[2], yaw], push);
       const seen = new Set();
       for (const m of horde.list) { seen.add(m.slot); histNow(1 + m.slot, [m.p[0], 0, m.p[2], m.yaw], push); }
+      this.avatars = WMP.avatars(this).slice(0, WHorde.MAX - WHorde.N);
+      this.avatars.forEach((a, k) => { seen.add(WHorde.N + k); histNow(1 + WHorde.N + k, [a.g.p[0], a.g.p[1], a.g.p[2], a.g.yaw], push); });
       for (let r = 0; r < WHorde.MAX; r++) if (!seen.has(r)) histNow(1 + r, [0, -50, 0, 0], push);
       const b = WM.len(this.beta());
       this.tau += dt * Math.sqrt(1 - b * b);                 // your own (proper) time runs slower
@@ -272,7 +275,7 @@ vec3 light(vec3 p, vec3 n, vec3 rd, vec3 alb, float ao){
     },
     toggleAll() { LAMPS.forEach(toggle); },
     carW() { return Math.min(6, 0.8 * c()) / CAR_R; },       // the carousel rim never reaches c
-    setBulletUniforms(gl, p) { WBullets.uploadRetarded(gl, p, [[this.bullets, 0], [horde.shots, 1]]); },
+    setBulletUniforms(gl, p) { WBullets.uploadRetarded(gl, p, [[this.bullets, 0], [horde.shots, 1], ...WMP.extraBullets(this).map(([l, e]) => [l, e ? 1 : 0])]); },
     setUniforms(gl, prog) {
       this.player.setUniforms3(gl, prog);
       const b = this.beta();
@@ -307,6 +310,7 @@ vec3 light(vec3 p, vec3 n, vec3 rd, vec3 alb, float ao){
       const ms = new Float32Array(WHorde.MAX * 4);
       for (let i = 0; i < WHorde.MAX; i++) ms[i * 4] = -1;
       for (const m of horde.list) ms.set([m.hp / 100, m.flash, m.dead, m.type], m.slot * 4);
+      (this.avatars || []).forEach((a, k) => ms.set([a.hp / 100, a.flash, a.dead, a.type], (WHorde.N + k) * 4));
       gl.uniform4fv(prog.u('uMonS'), ms);
     },
     stats() {
@@ -320,5 +324,13 @@ vec3 light(vec3 p, vec3 n, vec3 rd, vec3 alb, float ao){
     _test: { S, c, LAMPS, toggle },
   };
   horde.w = world;
+  // multiplayer (js/mp.js): you are a figure with feet + yaw; the monsters are run by the room's leader
+  world.ai = () => (world.zombies ? horde : null);
+  world.playerPoints = () => { const p = world.player.pos; return { eye: p, body: [p, [p[0], p[1] - 0.8, p[2]], [p[0], p[1] - 1.3, p[2]]] }; };
+  world.mp = {
+    space: WSwarm.spaces.torus([1e9, 1e9, 1e9]),
+    me() { const p = world.player.pos, f = world.player.forward; return { p: [p[0], p[1] - WPlayer.EYE, p[2]], yaw: Math.atan2(f[0], f[2]) }; },
+    respawn() { const r = a => (Math.random() - 0.5) * a; world.player.reset([r(6), WPlayer.EYE, -4 + r(3)]); },
+  };
   WE.register(world);
 })();

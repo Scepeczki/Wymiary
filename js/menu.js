@@ -15,7 +15,7 @@
       if (modeSel[i] == null) modeSel[i] = w.modes ? (fightModes(w)[0] != null ? fightModes(w)[0] : 0) : -1;
       const b = document.createElement('button');
       b.className = 'card';
-      b.innerHTML = `<div class="thumb"></div><span class="num">${i + 1}</span><span class="now">TERAZ</span><div class="ctxt"><b></b><div class="tags"></div></div>`;
+      b.innerHTML = `<div class="thumb"></div><span class="num">${i + 1}</span><span class="pp"></span><span class="now">TERAZ</span><div class="ctxt"><b></b><div class="tags"></div></div>`;
       b.querySelector('.thumb').style.backgroundImage = thumb(i) + `, linear-gradient(135deg, hsl(${i * 47 + 200},45%,30%), hsl(${i * 47 + 260},45%,14%))`;
       b.querySelector('b').textContent = w.name;
       fillTags(b.querySelector('.tags'), w);
@@ -34,10 +34,45 @@
     }
   }
   function markCards() {
+    const pres = WMP.presence();
     [...$('mapList').children].forEach((b, i) => {
       b.classList.toggle('sel', i === M.sel);
       b.classList.toggle('cur', i === WE.worldIndex);
+      const here = pres.filter(p => p.map === i), pp = b.querySelector('.pp');
+      pp.style.display = here.length ? 'block' : 'none';
+      const t = here.map(p => 'gracz ' + p.id).join(', ');
+      if (pp.textContent !== t) pp.textContent = t;
     });
+  }
+  // other players on the selected map, each with "join" (= this map in that player's mode)
+  let peersKey = '';
+  function showPeers() {
+    const w = WE.worlds[M.sel], here = WMP.presence().filter(p => p.map === M.sel);
+    const key = M.sel + '|' + here.map(p => p.id + ':' + p.mode).join(',');
+    if (key === peersKey) return;
+    peersKey = key;
+    const box = $('dPeers');
+    box.innerHTML = '';
+    for (const p of here) {
+      const row = document.createElement('div');
+      row.className = 'peerRow';
+      const mode = w.modes ? w.modes[p.mode] : null;
+      row.innerHTML = '<span></span><button>Dołącz</button>';
+      row.querySelector('span').textContent = `Gracz ${p.id} gra tutaj${mode ? ' — tryb: ' + mode.label : ''}`;
+      row.querySelector('button').addEventListener('click', () => { if (w.modes) modeSel[M.sel] = p.mode; play(); });
+      box.appendChild(row);
+    }
+  }
+  // opened from a game server and somebody already plays: preselect their map and mode (once)
+  let followed = false;
+  function followFirstPeer() {
+    if (followed || M.played) return;
+    const p = WMP.presence()[0];
+    if (!p) return;
+    followed = true;
+    if (WE.worlds[p.map] && WE.worlds[p.map].modes) modeSel[p.map] = p.mode;
+    select(p.map);
+    WE.toast(`Gracz ${p.id} gra na mapie ${p.map + 1}. ${WE.worlds[p.map].name} — kliknij GRAJ, żeby do niego dołączyć`, 5000);
   }
 
   function select(i) {
@@ -68,6 +103,8 @@
     const help = $('dHelp');
     help.innerHTML = '';
     for (const h of w.help || []) { const li = document.createElement('li'); li.textContent = h; help.appendChild(li); }
+    peersKey = '';
+    showPeers();
     updatePlayLabel();
   }
   // GRAJ: same map and mode as the one running = just continue; otherwise (re)start the map in the selected mode
@@ -79,6 +116,7 @@
   }
   function play(restart) {
     const w = WE.worlds[M.sel];
+    M.played = true;
     if (restart || !running()) {
       const opts = w.modes ? w.modes[modeSel[M.sel]].opts : {};
       w._modeIdx = w.modes ? modeSel[M.sel] : undefined;
@@ -162,12 +200,26 @@
     WE.onFrame = () => {
       syncSettings();
       const w = WE.world, hb = $('health'), du = $('duel');
-      const dt = w && w.duelHud ? w.duelHud() : '';
+      const dt = !w ? '' : WMP.pvp(w) ? WMP.hud(w) : (w.duelHud ? w.duelHud() : '') + WMP.coopLine(w);
       du.style.display = dt ? 'block' : 'none';
       if (dt && du.innerHTML !== dt) du.innerHTML = dt;
       hb.style.display = w && w.health != null ? 'block' : 'none';
       if (w && w.health != null) hb.firstChild.style.width = Math.max(0, w.health) + '%';
-      if (M.open) { markCards(); updatePlayLabel(); }
+      if (M.open) { markCards(); updatePlayLabel(); showPeers(); followFirstPeer(); }
+      const net = WMP.status();
+      if ($('net').textContent !== net) $('net').textContent = net;
+      // ammo
+      const am = $('ammo');
+      if (w && w.bullets) {
+        am.style.display = 'block';
+        am.style.left = w.health != null ? '250px' : '16px';
+        am.classList.toggle('reloading', WGun.reloading);
+        am.classList.toggle('empty', WGun.ammo === 0 && !WGun.reloading);
+        const t = WGun.reloading ? 'PRZEŁADOWANIE' : WGun.ammo === 0 ? 'R — przeładuj' : `${WGun.ammo} <small>/ ${WGun.constructor.MAG}</small>`;
+        const n = am.querySelector('.n');
+        if (n.innerHTML !== t) n.innerHTML = t;
+        am.querySelector('.rl div').style.width = (WGun.phase * 100).toFixed(1) + '%';
+      } else am.style.display = 'none';
     };
     M.show(true);
   };

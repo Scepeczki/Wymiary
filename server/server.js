@@ -121,7 +121,7 @@ function log(s) { console.log(new Date().toLocaleTimeString() + '  ' + s); }
 
 server.listen(PORT, '0.0.0.0', () => {
   const ips = Object.values(os.networkInterfaces()).flat().filter(i => i && i.family === 'IPv4' && !i.internal && !i.address.startsWith('169.254.')).map(i => i.address);
-  const q = '/?w=7&mode=3';
+  const q = '/';   // the menu: everybody picks a map (the menu shows where the others are)
   console.log('\n  WYMIARY — serwer gry sieciowej działa\n');
   console.log(`  Ty (na tym komputerze):   http://localhost:${PORT}${q}`);
   const ts = ip => /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(ip);   // Tailscale range 100.64.0.0/10

@@ -1,6 +1,7 @@
-// Usage: node tools/dev/mptest.js <outdir> — end-to-end multiplayer test on this PC:
-// starts the game server, opens two game windows (off-screen) that join a network game, places them facing
-// each other and saves a screenshot from each one.
+// Usage: node tools/dev/mptest.js <outdir> [map] [mode] [posA] [posB] [turnB] [extra query]
+// End-to-end multiplayer test on this PC: starts the game server, opens two game windows (off-screen) on the same
+// map and mode, places them facing each other and saves a screenshot from each one (mp1.png, mp2.png).
+// Default: the loop arena, network game.  e.g. 4D:  node tools/dev/mptest.js out 2 0 0,1.6,-3,0 0.4,1.6,3,0 3.1416
 const http = require('http'), fs = require('fs'), path = require('path'), cp = require('child_process');
 const out = process.argv[2] || '.', brave = 'C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe';
 const root = path.join(__dirname, '..', '..');
@@ -21,9 +22,11 @@ const recv = http.createServer((req, res) => {
 }).listen(8766, () => {
   // client 1 stands at z=-24 looking north, client 2 at z=-14 looking south (middle corridor / hall door)
   const shot = n => encodeURIComponent(`http://localhost:8766/shot?n=${n}`);
+  const [, , , map = '7', mode = '3', posA = '0,1.6,-26', posB = '0.5,1.6,-18', turnB = '3.1416', extra = '', extraB = ''] = process.argv;
+  const pa = posA === '-' ? '' : `&posf=300&pos=${posA}`, pb = posB === '-' ? '' : `&posf=300&pos=${posB}`;
   const urls = [
-    `http://localhost:8098/index.html?w=7&mode=3&frames=420&posf=300&pos=0,1.6,-26&shot=${shot('mp1')}`,
-    `http://localhost:8098/index.html?w=7&mode=3&frames=420&posf=300&pos=0.5,1.6,-18&turn=3.1416&shot=${shot('mp2')}`,
+    `http://localhost:8098/index.html?w=${map}&mode=${mode}&frames=420${pa}&${extra}&shot=${shot('mp1')}`,
+    `http://localhost:8098/index.html?w=${map}&mode=${mode}&frames=420${pb}&turn=${turnB}&${extra}&${extraB}&shot=${shot('mp2')}`,
   ];
   urls.forEach((url, i) => setTimeout(() => procs.push(cp.spawn(brave, [`--app=${url}`, `--user-data-dir=${process.env.TEMP}\\wymiary-mp${i}`,
     `--window-position=${-3000 - i * 1400},0`, '--window-size=1280,720', '--no-first-run', '--disable-backgrounding-occluded-windows',

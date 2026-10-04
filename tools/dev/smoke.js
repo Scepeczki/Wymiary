@@ -27,10 +27,26 @@ WE.worlds.forEach((w, i) => {
   console.log(`OK ${w.name}:${extra} | ${w.stats().replace(/\n/g, ' | ')}`);
 });
 const b = WE.worlds.find(w => w._test);
+// own curvature of the rooms: at the centre of every room the measured K equals its table value
+const statics = b ? [b._test.ROOM_K, b._test.COR_X, b._test.COR_Z] : [];
+const saved = statics.map(a => a.slice());
+const flatten = on => statics.forEach((a, k) => a.forEach((_, i) => { a[i] = on ? 0 : saved[k][i]; }));
+if (b) {
+  b.enter({ zombies: false });
+  let bad = 0;
+  for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
+    const want = b._test.ROOM_K[i + 2 + 5 * (j + 2)], got = b._test.localK([16 * i + 0.3, 2, 16 * j + 0.2]);
+    if (Math.abs(got - want) > 2e-3 + Math.abs(want) * 0.05) { bad++; console.log(`room ${i},${j}: K ${want} measured ${got.toFixed(4)}`); }
+  }
+  console.log(`rooms: own K measured at 25 room centres ${bad ? 'CHECK (' + bad + ')' : 'OK'}`);
+  const cor = b._test.COR_X[2 + 4 * 2], got = b._test.localK([8, 1.5, 0.1]);
+  console.log(`corridor (0,0)-(1,0): K ${cor} measured ${got.toFixed(4)} ${Math.abs(got - cor) < 0.01 + Math.abs(cor) * 0.05 ? 'OK' : 'CHECK'}`);
+}
 // global curvature: with only the global term, K must be constant over the whole map
 if (b) {
   const S = b._test.S;
   b.enter({ zombies: false });
+  flatten(true);
   for (const g of [-1, -0.5, 0.5, 1]) {
     S.g = g;
     const want = b._test.globalK();
@@ -46,12 +62,13 @@ if (b) {
   WE.keys = {};
   b.enter({ zombies: true });
   const h = b._test.horde;
-  // curvature at the centre of each bubble must equal the bubble's K
+  // curvature at the centre of each bubble must equal the bubble's K (rooms flat for this check)
   b.update(0.001, { dx: 0, dy: 0 });
   for (const m of h.list.slice(0, 2)) {
     const k = b._test.localK([m.p[0], 1.0, m.p[2]]);
     console.log(`monster type ${m.type} bubble K measured ${k.toFixed(3)} (expected ${m.type ? -0.6 : 0.9})`);
   }
+  flatten(false);
   let shots = 0, minHealth = 100;
   const start = h.list.map(m => m.p.slice());
   for (let f = 0; f < 60 * 25; f++) {

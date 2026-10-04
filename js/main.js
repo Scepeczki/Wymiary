@@ -8,6 +8,7 @@
   if (q.has('defs')) WE.debugDefs = q.get('defs').split(',').map(d => '#define ' + d + '\n').join('');
   if (q.has('proj')) WE.projMode = +q.get('proj') % WE.PROJ_NAMES.length;
   WMenu.init();
+  WMP.start();                      // opened from a game server: connect (multiplayer on every map)
   if (q.has('shot')) WMenu.show(false);
   const wi = WM.clamp((+q.get('w') || 1) - 1, 0, WE.worlds.length - 1), wm = WE.worlds[wi].modes;
   WE.switchWorld(wi, Object.assign({ instant: true }, q.has('mode') && wm ? wm[+q.get('mode')].opts : {}));

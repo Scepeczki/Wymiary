@@ -94,7 +94,7 @@
         const p = proj(e); ctx.fillStyle = color; ctx.beginPath(); ctx.arc(p[0], p[1], 3, 0, Math.PI * 2); ctx.fill();
         if (text) label(e, text, color);
       };
-      arrow(kata, 5, COL.kata, 'ana (R)');
+      arrow(kata, 5, COL.kata, 'ana (T)');
       arrow(right, 3.5, 'rgba(255,255,255,.6)', '');
       arrow(fwd, 6, COL.fwd, 'przód');
       const pp = proj(P);
@@ -118,7 +118,7 @@
       ctx.fillStyle = COL.fwd; ctx.fillText(`przód: ${tilt >= 0 ? '+' : ''}${tilt.toFixed(0)}° w stronę W`, 8, 28);
       ctx.fillStyle = COL.slice + '0.9)'; ctx.fillText(`przekrój odchylony od W=const o ${sliceTilt.toFixed(0)}°`, 8, 42);
       ctx.fillStyle = COL.w; ctx.fillText(`w = ${P[2].toFixed(2)}`, W - 70, 14);
-      ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.fillText(this.follow ? 'G: widok stały' : 'G: widok za tobą', W - 104, H - 8);
+      ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.fillText(this.follow ? 'B: widok stały' : 'B: widok za tobą', W - 104, H - 8);
       ctx.restore();
     }
   }
