@@ -31,6 +31,36 @@
   #tut .keys { font-size: 12px; opacity: .6; margin-top: 8px; }
   #tut kbd { display: inline-block; padding: 0 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08); font-size: 12px; }
   .ax-x { color: #ff6b6b; font-weight: bold; } .ax-y { color: #5ee08a; font-weight: bold; } .ax-z { color: #5aa9ff; font-weight: bold; } .ax-w { color: #d77bff; font-weight: bold; }
+  #dExtra:empty { display: none; }
+  #dExtra { display: flex; flex-direction: column; gap: 8px; }
+  .modeBtn.lay.lay::before { content: none; }
+  #lvwin { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.55); font-family: system-ui, 'Segoe UI', sans-serif; }
+  #lvwin .ed { width: 860px; max-width: calc(100vw - 32px); max-height: calc(100vh - 40px); overflow-y: auto; padding: 18px 22px; border-radius: 14px; background: #120e26; border: 1px solid rgba(160,190,255,.35); box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+  #lvwin h3 { margin: 0 0 6px; } #lvwin p { font-size: 13px; opacity: .8; margin: 0 0 8px; }
+  #lvwin .lvgrid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  #lvwin .btns { display: flex; justify-content: flex-end; margin-top: 12px; }
+  #lvwin .btns button { padding: 7px 16px; border-radius: 8px; border: 0; font: inherit; cursor: pointer; background: linear-gradient(90deg,#7df,#f7d); color: #120a20; font-weight: bold; }
+  .lvgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+  .lvgrid h4 { grid-column: 1 / -1; margin: 6px 0 0; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; opacity: .55; font-weight: normal; }
+  .lv { text-align: left; padding: 7px 9px; border-radius: 8px; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.05); color: inherit; font: inherit; font-size: 12px; cursor: pointer; line-height: 1.3; }
+  .lv:hover { border-color: rgba(140,200,255,.6); }
+  .lv.done { border-color: rgba(120,255,150,.45); background: rgba(120,255,150,.08); }
+  .lv.cur { border-color: #fd7; }
+  .lv b { display: block; font-size: 13px; }
+  .lv small { opacity: .65; }
+  #lay4d { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.55); font-family: system-ui, 'Segoe UI', sans-serif; }
+  #lay4d .ed { width: 560px; max-width: calc(100vw - 32px); padding: 18px 22px; border-radius: 14px; background: #120e26; border: 1px solid rgba(160,190,255,.35); box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+  #lay4d h3 { margin: 0 0 6px; }
+  #lay4d p { font-size: 13px; opacity: .8; margin: 0 0 12px; }
+  #lay4d .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  #lay4d .q { padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.04); display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+  #lay4d .q small { opacity: .6; letter-spacing: 1px; text-transform: uppercase; font-size: 10px; }
+  #lay4d .q { min-width: 0; }
+  #lay4d select { width: 100%; min-width: 0; font: inherit; font-size: 12px; padding: 4px; border-radius: 6px; background: #1d1838; color: #e8f0ff; border: 1px solid rgba(255,255,255,.25); }
+  #lay4d .one { display: block; margin: 12px 0 4px; font-size: 13px; }
+  #lay4d .btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+  #lay4d button { padding: 7px 14px; border-radius: 8px; border: 0; font: inherit; cursor: pointer; background: rgba(255,255,255,.12); color: inherit; }
+  #lay4d #layClose { background: linear-gradient(90deg,#7df,#f7d); color: #120a20; font-weight: bold; }
   #split { position: fixed; inset: 0; pointer-events: none; display: none; }
   #split div { position: absolute; width: 50%; height: 50%; box-sizing: border-box; border: 1px solid rgba(255,255,255,.35); padding: 6px 10px; font-size: 12px; text-align: center; text-shadow: 0 1px 3px #000; }
   #split b { color: #fd7; font-size: 14px; margin-right: 6px; letter-spacing: 2px; }
@@ -126,7 +156,6 @@
 <body>
 <canvas id="c"></canvas>
 <div id="cross"></div>
-<div id="split"><div style="left:0;top:0"><b>x y z</b> zwykły widok (x, y — podłoga, z — wysokość)</div><div style="left:50%;top:0"><b>w y z</b> zamiast „w prawo” — oś W</div><div style="left:0;top:50%"><b>x w z</b> zamiast „do przodu” — patrzysz wzdłuż W</div><div style="left:50%;top:50%"><b>x y w</b> zamiast wysokości — oś W (poziomy przekrój na wysokości oczu)</div></div>
 <div id="hud"><div class="name" id="hudName"></div><div class="sub" id="hudSub"></div><div class="stats" id="hudStats"></div></div>
 <div id="help"></div>
 <div id="toast"></div>
@@ -152,6 +181,7 @@
       <div class="tags" id="dTags"></div>
       <div id="dPeers"></div>
       <p id="dDesc"></p>
+      <div id="dExtra"></div>
       <div id="dModesWrap"><h3>Tryb gry</h3><div id="dModes"></div></div>
       <div id="dSetWrap"><h3>Ustawienia mapy</h3><div id="dSet"></div></div>
       <div><h3>Na tej mapie</h3><ul id="dHelp"></ul></div>

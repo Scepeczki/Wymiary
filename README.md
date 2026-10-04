@@ -58,7 +58,7 @@ Postęp widać w zakładce **Actions** repozytorium, gotowe wydania w **Releases
 | 4D: Q/E, Z/C | obrót przód↔W, obrót prawo↔W · **dwa szybkie naciśnięcia** tego samego klawisza wyrównują ten obrót do osi (do 0° albo 180°, bliżej którego jesteś) |
 | 4D: Y | następna **kamera**: (x y z) → (w y z) → (x w z) → (x y w) — każda to przekrój przez inną trójkę twoich kierunków |
 | 4D: X, B | reset obrotu 4D · kompas 4D: obraca się z tobą / stały / ukryty |
-| 4D: F | **cztery widoki** naraz — przekroje przez różne trójki twoich osi (x = w prawo, y = do przodu, z = w górę, w = ana): (x y z) zwykły, (w y z) zamiast „w prawo” oś W, (x w z) patrzysz wzdłuż W, (x y w) zamiast wysokości oś W (poziomy przekrój 3D na wysokości oczu) |
+| 4D: F | (układ ustawisz w menu: **⚙ Układ widoków 4D** — dla każdej ćwiartki kamera albo pusta, gizmo wł./wył.; zapamiętywane) **cztery widoki** naraz — przekroje przez różne trójki twoich osi (x = w prawo, y = do przodu, z = w górę, w = ana): (x y z) zwykły, (w y z) zamiast „w prawo” oś W, (x w z) patrzysz wzdłuż W, (x y w) zamiast wysokości oś W (poziomy przekrój 3D na wysokości oczu) |
 | Korytarze K: Q/E, X | K całej mapy, płasko (to samo suwakiem w menu); tryb z potworami wybierasz na karcie mapy |
 | Wolne światło: Q/E, L, F, B/J/K | prędkość światła, wszystkie lampy, lampa na celowniku, aberracja / Doppler / opóźnienie światła |
 
@@ -70,7 +70,12 @@ Postęp widać w zakładce **Actions** repozytorium, gotowe wydania w **Releases
    obroty w W (Q / E, Z / C) i wyrównywanie dwukrotnym naciśnięciem → każda kamera osobno: co pokazuje i jak ją sobie
    wyobrazić (szereg słupów ułożonych wzdłuż W widać w (w y z) obok siebie, w (x w z) jako aleję w głąb, w (x y w) jako
    wieżę) → cztery kamery naraz → sprawdzian (klatka ze ścianami grubymi tylko w W). Enter — dalej, Backspace — wstecz,
-   lekcję można wybrać suwakiem w menu. Test: `node tools/dev/tutorial.js`.
+   a po lekcjach **10 poziomów ćwiczeń** z orientacji i ruchu w 4D, coraz trudniejszych: zbieranie kryształów
+   na podłodze, w jednym miejscu przy różnych w, rozrzuconych w (x, y, w), w klatkach o grubości w W, most wzdłuż W, ukośny
+   most (trzeba obrócić się o 45° w W), ścieżka skręcająca w osiach y, w, x, schody przez W, kryształy bez podpowiedzi
+   (tylko kompas 4D) i na czas. Złota strzałka w gizmo wskazuje najbliższy kryształ (z „% poza” widokiem).
+   **Okno wyboru** lekcji i poziomów: klawisz **L** w grze albo przycisk w menu; ✓ i rekordowe czasy zapamiętuje przeglądarka.
+   Testy: `node tools/dev/tutorial.js` (wszystkie lekcje) i `node tools/dev/levels.js` (każdy poziom przechodni).
 3. **Tesserakt 4D** — prawdziwe 4D (x,y,z,w); widzisz przekrój 3D. Start w klatce, z której wychodzi się przez W.
    W rogu **kompas 4D**: pion (y) nigdy się nie obraca, więc cały ruch i obroty dzieją się w 3-wymiarowej przestrzeni
    (x, z, w) — kompas rysuje ją jako model 3D (podłoga mapki = x/z, pion mapki = W): Ty ze śladem, płaszczyzna

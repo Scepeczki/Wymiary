@@ -99,6 +99,16 @@
     });
     // settings + keys
     buildSettings($('dSet'), w, true);
+    // 4D maps: the layout of the four views; maps with their own panel (the tutorial: lessons and levels)
+    const ex = $('dExtra');
+    ex.innerHTML = '';
+    if (w.is4D) {
+      const b = document.createElement('button');
+      b.className = 'modeBtn lay'; b.textContent = '⚙ Układ widoków 4D (kamery w ćwiartkach, gizmo)';
+      b.addEventListener('click', () => W4D.openEditor());
+      ex.appendChild(b);
+    }
+    if (w.menuPanel) w.menuPanel(ex, () => play(true));
     $('dSetWrap').style.display = (w.settings || []).length ? '' : 'none';
     const help = $('dHelp');
     help.innerHTML = '';
@@ -168,7 +178,7 @@
   M.show = function (open) {
     M.open = open;
     $('menu').classList.toggle('open', open);
-    for (const id of ['hud', 'cross', 'wset', 'duel', 'health', 'mini', 'ammo', 'split', 'gizmo', 'layer', 'tut', 'viewlabel']) { const e = $(id); if (e) e.style.visibility = open ? 'hidden' : ''; }
+    for (const id of ['hud', 'cross', 'wset', 'duel', 'health', 'mini', 'ammo', 'gizmo', 'layer', 'tut', 'viewlabel']) { const e = $(id); if (e) e.style.visibility = open ? 'hidden' : ''; }
     $('help').style.opacity = open ? 0 : 0.8;
     if (open) select(WE.worldIndex >= 0 ? WE.worldIndex : M.sel);
   };
@@ -207,8 +217,10 @@
       if (w && w.health != null) hb.firstChild.style.width = Math.max(0, w.health) + '%';
       if (M.open) { markCards(); updatePlayLabel(); showPeers(); followFirstPeer(); }
       // split screen (4D): labels, and the crosshair in the middle of the normal view
-      const split = !!(w && w.splitView && w.splitView());
-      $('split').style.display = split ? 'block' : 'none';
+      // 4D: the crosshair sits in the middle of the normal camera (wherever the layout puts it)
+      const cp = w && w.crossPos ? w.crossPos() : [50, 50];
+      $('cross').style.display = cp ? '' : 'none';
+      if (cp) { $('cross').style.left = cp[0] + '%'; $('cross').style.top = cp[1] + '%'; }
       const vl = w && w.viewLabel ? w.viewLabel() : '';
       $('viewlabel').style.display = vl ? 'block' : 'none';
       if (vl && $('viewlabel').innerHTML !== vl) $('viewlabel').innerHTML = vl;
@@ -217,7 +229,6 @@
       if (tut && $('tut').innerHTML !== tut) $('tut').innerHTML = tut;
       $('help').style.display = tut ? 'none' : '';
       if (tut) $('wset').style.display = 'none';
-      $('cross').style.left = split ? '25%' : ''; $('cross').style.top = split ? '25%' : '';
       const net = WMP.status();
       if ($('net').textContent !== net) $('net').textContent = net;
       // ammo
