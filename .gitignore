@@ -1,0 +1,7 @@
+# built installers and local-only files
+dist/
+runtime/
+version.txt
+*.lnk
+*.log
+node_modules/

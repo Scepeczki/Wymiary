@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Wymiary</title>
+<link rel="icon" href="assets/icon.png">
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: Consolas, "Segoe UI", monospace; color: #e8f0ff; }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  #fade { position: fixed; inset: 0; background: #000; opacity: 1; pointer-events: none; transition: opacity .35s; display: flex; align-items: center; justify-content: center; font-size: 16px; color: #9ab; letter-spacing: 1px; }
+  #hud { position: fixed; left: 16px; top: 12px; pointer-events: none; text-shadow: 0 1px 3px #000, 0 0 8px #000; transition: opacity .2s; }
+  #hud .name { font-size: 22px; font-weight: bold; letter-spacing: 1px; }
+  #hud .sub { font-size: 13px; opacity: .85; max-width: 560px; margin-top: 2px; }
+  #hud .stats { font-size: 12px; opacity: .75; margin-top: 6px; white-space: pre; }
+  #help { position: fixed; right: 16px; top: 12px; font-size: 12px; line-height: 1.5; text-align: right; pointer-events: none; opacity: .8; white-space: pre; text-shadow: 0 1px 3px #000; transition: opacity .2s; }
+  #cross { position: fixed; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255,255,255,.8); box-shadow: 0 0 4px #000; pointer-events: none; }
+  #toast { position: fixed; left: 50%; bottom: 22%; transform: translateX(-50%); font-size: 18px; padding: 8px 18px; background: rgba(0,0,0,.55); border-radius: 6px; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  #hurt { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, rgba(255,0,0,0) 40%, rgba(255,0,0,.55)); }
+
+  /* map menu: a column on the left, the world keeps rendering on the right */
+  #menu { position: fixed; left: 0; top: 0; bottom: 0; width: 400px; max-width: 100vw; box-sizing: border-box; padding: 28px 22px;
+          background: linear-gradient(90deg, rgba(8,6,20,.94) 70%, rgba(8,6,20,.0)); display: flex; flex-direction: column; gap: 10px;
+          transform: translateX(-105%); transition: transform .25s; overflow-y: auto; }
+  #menu.open { transform: none; }
+  #menu h1 { font-size: 44px; margin: 0; letter-spacing: 10px; background: linear-gradient(90deg,#7df,#f7d,#fd7); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #menu .lead { font-size: 13px; opacity: .7; margin: 0 0 8px; }
+  .map { display: flex; gap: 12px; align-items: flex-start; text-align: left; width: 92%; padding: 10px 12px; border: 1px solid rgba(255,255,255,.12);
+         border-radius: 8px; background: rgba(255,255,255,.04); color: inherit; font: inherit; cursor: pointer; transition: background .15s, border-color .15s; }
+  .map:hover { background: rgba(120,180,255,.14); border-color: rgba(140,200,255,.5); }
+  .map.active { border-color: #fd7; background: rgba(255,220,120,.1); }
+  .map .num { font-size: 20px; font-weight: bold; opacity: .6; min-width: 16px; }
+  .map b { display: block; font-size: 15px; }
+  .map small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 11px; opacity: .65; margin-top: 3px; line-height: 1.35; }
+  #playBtn { width: 92%; margin-top: 6px; padding: 12px; font: inherit; font-size: 16px; font-weight: bold; letter-spacing: 2px; color: #120a20; border: 0; border-radius: 8px;
+             background: linear-gradient(90deg,#7df,#f7d); cursor: pointer; }
+  #menu .keys { font-size: 11px; opacity: .55; line-height: 1.7; margin-top: 8px; }
+
+  /* live settings of the current map */
+  #wset { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 10px 16px; background: rgba(0,0,0,.45); border-radius: 10px;
+          font-size: 12px; display: none; pointer-events: none; }
+  #wset.interactive { pointer-events: auto; background: rgba(8,6,20,.85); }
+  .srow { display: grid; grid-template-columns: 130px 300px 190px; align-items: center; gap: 10px; margin: 3px 0; }
+  .srow input { width: 100%; accent-color: #7df; }
+  .srow input[type=checkbox] { width: 18px; height: 18px; justify-self: start; }
+  .srow .val { font-variant-numeric: tabular-nums; opacity: .9; }
+  .shint { font-size: 10px; opacity: .5; margin-top: 4px; text-align: center; }
+  .modes { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
+  .mode { font-size: 11px; padding: 3px 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.06); }
+  .mode:hover { background: rgba(255,120,120,.25); border-color: #f99; }
+  #health { position: fixed; left: 16px; bottom: 16px; width: 220px; height: 10px; border-radius: 5px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.3); display: none; overflow: hidden; }
+  #health div { height: 100%; width: 100%; background: linear-gradient(90deg,#f44,#fa4); transition: width .2s; }
+  #mini { position: fixed; right: 14px; bottom: 14px; width: 300px; height: 300px; display: none; pointer-events: none; border-radius: 10px; background: rgba(6,4,16,.55); border: 1px solid rgba(255,255,255,.18); }
+  #duel { position: fixed; left: 50%; top: 10px; transform: translateX(-50%); display: none; pointer-events: none; text-align: center; font-size: 15px; text-shadow: 0 1px 3px #000; }
+  #duel .score { font-size: 22px; font-weight: bold; letter-spacing: 2px; }
+  #duel .bar { width: 240px; height: 8px; margin: 4px auto; border-radius: 4px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.3); overflow: hidden; }
+  #duel .bar div { height: 100%; background: linear-gradient(90deg,#c22,#f64); }
+  #ammo { position: fixed; left: 250px; bottom: 11px; font-size: 16px; text-shadow: 0 1px 3px #000; pointer-events: none; }
+  #err { position: fixed; inset: 0; background: #200; color: #fbb; padding: 20px; white-space: pre-wrap; font-size: 12px; overflow: auto; display: none; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="cross"></div>
+<div id="hud"><div class="name" id="hudName"></div><div class="sub" id="hudSub"></div><div class="stats" id="hudStats"></div></div>
+<div id="help"></div>
+<div id="toast"></div>
+<div id="hurt"></div>
+<div id="wset"></div>
+<div id="duel"></div>
+<div id="health"><div></div></div>
+<canvas id="mini" width="300" height="300"></canvas>
+<div id="fade"></div>
+<div id="menu">
+  <h1>WYMIARY</h1>
+  <p class="lead">wybierz mapę <span id="prep"></span></p>
+  <div id="mapList" style="display:flex;flex-direction:column;gap:8px"></div>
+  <button id="playBtn">▶ GRAJ</button>
+  <div class="keys">
+    WASD ruch · mysz rozglądanie · LPM strzał · Spacja skok · Shift bieg<br>
+    1–7 szybki wybór mapy · Esc / M menu · P projekcja · [ ] rozdzielczość<br>
+    kółko myszy FOV · N noclip · V dźwięk · F11 pełny ekran
+  </div>
+</div>
+<div id="err"></div>
+
+<script src="js/math.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/glsl.js"></script>
+<script src="js/physics.js"></script>
+<script src="js/weapons.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/net.js"></script>
+<script src="js/monsters.js"></script>
+<script src="js/worlds/building.js"></script>
+<script src="js/compass4d.js"></script>
+<script src="js/worlds/tesseract.js"></script>
+<script src="js/worlds/hyperbolic.js"></script>
+<script src="js/worlds/spherical.js"></script>
+<script src="js/worlds/torus.js"></script>
+<script src="js/worlds/lightspeed.js"></script>
+<script src="js/worlds/loops.js"></script>
+<script src="js/menu.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
