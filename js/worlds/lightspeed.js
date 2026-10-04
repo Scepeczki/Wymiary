@@ -193,6 +193,7 @@ vec3 light(vec3 p, vec3 n, vec3 rd, vec3 alb, float ao){
   const world = {
     name: 'Wolne światło',
     subtitle: 'Szczególna teoria względności z regulowaną prędkością światła c. Światło potrzebuje czasu: przełączone lampy wysyłają widoczny front światła, zegar na końcu hali spóźnia się o d/c, a w lustrzanych ścianach widzisz siebie sprzed chwili — każde kolejne odbicie jeszcze dawniej. W trybie z potworami widzisz je tam, gdzie były.',
+    tags: ['wolne światło', 'lustro', 'potwory'],
     help: ['WASD ruch · Shift bieg', 'Q / E — prędkość światła c', 'lustrzane ściany po bokach: odbicie się spóźnia', 'L — wszystkie lampy · F — lampa na celowniku', 'strzał w żarówkę też ją przełącza', 'B aberracja · J Doppler (efekty ruchu, domyślnie wył.)', 'K opóźnienie światła'],
     shader: () => WG.euclid(code, '#define CUSTOM_LIGHT\n#define RELATIVITY\n#define RETARDED\n#define MIRROR\n#define RETARD_HOOK\n#define FOG_DENS .004\n#define MAX_T 150.\n'),
     bullets: new WBullets(WBallistics.flat(3, { speed: 32 }), {

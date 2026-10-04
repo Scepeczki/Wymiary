@@ -63,7 +63,7 @@
       }
 
       // landmarks
-      for (const m of this.marks) {
+      for (const m of this.marks.concat(this.extra || [])) {
         if (m.box) {
           const [[x0, x1], [z0, z1], [w0, w1]] = m.box;
           const c = [[x0, z0, w0], [x1, z0, w0], [x1, z1, w0], [x0, z1, w0], [x0, z0, w1], [x1, z0, w1], [x1, z1, w1], [x0, z1, w1]];
@@ -73,6 +73,7 @@
           const p = proj(m.at), r = Math.max(2, m.r * S / (1 + p[2] * 0.012));
           ctx.strokeStyle = m.color; ctx.lineWidth = 1.2; ctx.setLineDash([]);
           ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, Math.PI * 2); ctx.stroke();
+          if (m.fill) { ctx.fillStyle = m.color; ctx.fill(); line(m.at, [m.at[0], m.at[1], P[2]], m.color, 1, [2, 3]); }
           if (m.label) label(m.at, m.label, m.color);
         }
       }

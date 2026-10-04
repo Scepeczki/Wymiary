@@ -2,6 +2,7 @@
 // vectors; Q/E and Z/C rotate the view into the 4th axis, R/F step along it.
 (function () {
   const code = `
+${WSwarm.glslMat(false, 1, true)}
 mat2 rot(float a){ float c=cos(a), s=sin(a); return mat2(c,-s,s,c); }
 // edges of a tesseract (4D box frame)
 float sdFrame4(vec4 p, vec4 b, float e){
@@ -51,6 +52,9 @@ vec2 map(vec4 p){
   vec4 t = p - vec4(-14, 6, 14, 0);
   t.xw = rot(uTime*.23)*t.xw;
   r = opU(r, vec2(length(vec2(length(t.xy)-2., length(t.zw)-2.))-.45, 12.));
+#ifndef PROBE
+  r = opU(r, enemies(p));
+#endif
   return r;
 }
 vec3 sky(vec4 rd){
@@ -68,6 +72,7 @@ float grid4(vec4 p, vec4 n){
   return smoothstep(.44,.49,a);
 }
 vec3 material(float id, vec4 p, vec4 n, inout float emit){
+  if (id > 19.5) return enemyColor(id, p, n, emit);
   float g = grid4(p, n);
   vec3 wc = hsv(fract(p.w*.07+.6), .55, 1.);        // hue encodes the w coordinate
   if (id < 1.5) return mix(vec3(.45,.43,.5)*mix(vec3(1), wc, .35), vec3(.28,.26,.32), g);
@@ -92,9 +97,10 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
   const world = {
     name: 'Tesserakt 4D',
     subtitle: 'Czterowymiarowy świat (x, y, z, w). Widzisz trójwymiarowy przekrój. Jesteś zamknięty w pokoju — ale ściany mają grubość tylko w osi W. Wyjdź przez czwarty wymiar.',
-    help: ['pociski lecą w 4D: po obrocie w W znikają z przekroju', 'R / F — krok w osi W (ana / kata)', 'Q / E — obrót widoku w płaszczyźnie przód–W', 'Z / C — obrót w płaszczyźnie prawo–W', 'X — wyzeruj obrót 4D', 'kompas 4D w rogu · G — widok stały / za tobą', 'kolor = współrzędna W'],
+    tags: ['4D', 'potwory z osi W', 'kompas 4D'],
+    help: ['pociski lecą w 4D: po obrocie w W znikają z przekroju', 'R / F — krok w osi W (ana / kata)', 'Q / E — obrót widoku w płaszczyźnie przód–W', 'Z / C — obrót w płaszczyźnie prawo–W', 'X — wyzeruj obrót 4D', 'walka: czerwone kropki na kompasie = potwory (mogą być obok w osi W!)', 'kompas 4D w rogu · G — widok stały / za tobą', 'kolor = współrzędna W'],
     shader: () => WG.nd(code),
-    bullets: new WBullets(WBallistics.flat(4, { speed: 28 })),
+    bullets: new WBullets(WBallistics.flat(4, { speed: 28 }), { hitTest: q => swarm.hitTest(q) }),
     aim() { return this.player.aim(); },
     reverb: 0.08,
     // 4D: amplitude ~ 1/r^1.5 and a Huygens-violating tail behind every wavefront; sound coming mostly
@@ -108,16 +114,18 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
       a.tail4d = r;
       return [a];
     },
-    enter() {
+    enter(opts = {}) {
       if (!this.player) this.player = new WPlayer(4, { spawn: [0, WPlayer.EYE, -1, 0] });
       this.player.reset([0, WPlayer.EYE, -1, 0]);
       compass.reset();
+      WSwarm.startMode(this, swarm, opts);
       if (!this._gKey) {
         this._gKey = true;
         window.addEventListener('keydown', e => { if (e.code === 'KeyG' && !e.repeat && WE.world === world) compass.follow = !compass.follow; });
       }
     },
     update(dt, look) {
+      swarm.update(dt);
       const p = this.player;
       if (WE.keys.KeyX) {
         // flatten the view back into the xz hyperplane
@@ -131,13 +139,34 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
         moves: [[2, 'KeyF', 'KeyR']],
       });
     },
-    setUniforms(gl, prog) { this.player.setUniformsND(gl, prog); },
-    drawOverlay(ctx, W, H, dt) { compass.draw(ctx, W, H, dt, this.player); },
+    // monsters appear 11-17 m away in a random horizontal direction of the 3D space (x, z, w)
+    spawn(i, wave) {
+      const p = this.player.pos;
+      let d;
+      do d = [Math.random() - 0.5, 0, Math.random() - 0.5, Math.random() - 0.5]; while (WM.len(d) < 0.2);
+      d = WM.norm(d);
+      const at = WM.addScaled([p[0], 0, p[2], p[3]], d, 11 + Math.random() * 6);
+      return swarm.sp.place(at, WM.scale(d, -1));
+    },
+    playerPoints() {
+      const p = this.player.pos, dn = k => [p[0], p[1] - k, p[2], p[3]];
+      return { eye: p, body: [p, dn(0.8), dn(1.3)] };
+    },
+    setUniforms(gl, prog) { this.player.setUniformsND(gl, prog); swarm.setUniforms(gl, prog); },
+    setBulletUniforms(gl, p) { WBullets.uploadSigned(gl, p, [[this.bullets, false], [swarm.shots, true]]); },
+    drawOverlay(ctx, W, H, dt) {
+      // monsters on the compass: red dots (you see only those that lie in your 3D slice)
+      compass.extra = swarm.list.filter(m => m.dead < 0).map(m => ({ label: '', color: '#ff4b4b', at: [m.g.p[0], m.g.p[2], m.g.p[3]], r: 0.45, fill: true }));
+      compass.draw(ctx, W, H, dt, this.player);
+    },
     stats() {
       const p = this.player, f = p.forward;
       const tilt = Math.asin(WM.clamp(f[3], -1, 1)) * 180 / Math.PI;
       return `x ${p.pos[0].toFixed(1)}  y ${p.pos[1].toFixed(1)}  z ${p.pos[2].toFixed(1)}  w ${p.pos[3].toFixed(2)}\nnachylenie wzroku w W: ${tilt.toFixed(0)}°`;
     },
   };
+  const swarm = new WSwarm(world, WSwarm.spaces.flat4(), {
+    range: 28, shotModel: WBallistics.flat(4, { speed: 10, gravity: 0, life: 5, radius: 0.09 }),
+  });
   WE.register(world);
 })();

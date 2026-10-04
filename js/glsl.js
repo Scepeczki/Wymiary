@@ -394,12 +394,15 @@ ${defs}${dbg()}
 ${code}
 `;
     const render = common + `
-vec2 bulletDist(vec4 p){
-  vec2 r = vec2(1e9);
+// x = distance to the nearest bullet, y / z = distance in radii (halo) for player / enemy bullets,
+// w = 1 if the nearest one is an enemy projectile (marked by a negative radius)
+vec4 bulletDist(vec4 p){
+  vec4 r = vec4(1e9, 1e9, 1e9, 0.);
   for (int i = 0; i < ${G.MAX_BULLETS}; i++){
     if (i >= uBulletN) break;
-    float d = length(p - uBullets[i]) - uBulletR[i];
-    r = vec2(min(r.x, d), min(r.y, d/uBulletR[i]));
+    float R = abs(uBulletR[i]), d = length(p - uBullets[i]) - R, e = uBulletR[i] < 0. ? 1. : 0.;
+    if (d < r.x) { r.x = d; r.w = e; }
+    if (e > .5) r.z = min(r.z, d/R); else r.y = min(r.y, d/R);
   }
   return r;
 }
@@ -429,21 +432,21 @@ void main(){
   vec4 ro = uPos + uBasis*lo;
   vec4 rd = uBasis*ld;
   float t = 0.; vec2 h = vec2(1e9,-1.); bool hit = false, inside = true;
-  float bmin = 1e9;
+  float bmin = 1e9, emin = 1e9;
   for (int i = 0; i < 220; i++){
     vec4 p = ro+rd*t;
     h = map(p);
     if (inside) { if (h.x < .02 && t < 60.) { t += abs(h.x)+.03; continue; } inside = false; }
-    vec2 bd = bulletDist(p);
-    bmin = min(bmin, bd.y);
-    if (bd.x < h.x) h = vec2(bd.x, 99.);
+    vec4 bd = bulletDist(p);
+    bmin = min(bmin, bd.y); emin = min(emin, bd.z);
+    if (bd.x < h.x) h = vec2(bd.x, 99. + bd.w);
     if (h.x < .0004 + t*1.2/uRes.y) { hit = true; break; }
     if (t > 160.) break;
     t += h.x*.95;
   }
   vec3 skyc = sky(rd);
   vec3 col = inside ? vec3(.06,.055,.07) : skyc;
-  if (hit && h.y > 98.) col = BULLET_COL*5.;
+  if (hit && h.y > 98.) col = h.y > 99.5 ? ENEMY_COL*2.2 : BULLET_COL*5.;
   else if (hit) {
     vec4 p = ro+rd*t;
     vec4 n = grad(p);
@@ -458,7 +461,7 @@ void main(){
     col += alb*emit + vec3(.9,.3,1.)*hidden*.35*ao;
     col = mix(skyc, col, exp(-FOG_DENS*t));
   }
-  col += BULLET_COL*exp(-max(bmin, 0.)*.6)*1.2;
+  col += BULLET_COL*exp(-max(bmin, 0.)*.6)*1.2 + ENEMY_COL*exp(-max(emin, 0.)*1.5)*.9;
   col = applyGun(col, lo, ld);
   fragColor = vec4(post(col, gl_FragCoord.xy), 1);
 }`;
@@ -497,12 +500,15 @@ ${defs}${dbg()}
 ${code}
 `;
     const render = common + `
-vec2 bulletDist(vec4 p){
-  vec2 r = vec2(1e9);
+// x = distance to the nearest bullet, y / z = distance in radii (halo) for player / enemy bullets,
+// w = 1 if the nearest one is an enemy projectile (marked by a negative radius)
+vec4 bulletDist(vec4 p){
+  vec4 r = vec4(1e9, 1e9, 1e9, 0.);
   for (int i = 0; i < ${G.MAX_BULLETS}; i++){
     if (i >= uBulletN) break;
-    float d = kdist(p, uBullets[i]) - uBulletR[i];
-    r = vec2(min(r.x, d), min(r.y, d/uBulletR[i]));
+    float R = abs(uBulletR[i]), d = kdist(p, uBullets[i]) - R, e = uBulletR[i] < 0. ? 1. : 0.;
+    if (d < r.x) { r.x = d; r.w = e; }
+    if (e > .5) r.z = min(r.z, d/R); else r.y = min(r.y, d/R);
   }
   return r;
 }
@@ -531,20 +537,20 @@ void main(){
     rd = rd - KSIGN*kdot(rd, ro)*ro; rd /= sqrt(max(1e-9, kdot(rd,rd)));
   }
   float t = 0.; vec2 h = vec2(1e9,-1.); vec4 p = ro; bool hit = false;
-  float bmin = 1e9;
+  float bmin = 1e9, emin = 1e9;
   for (int i = 0; i < 200; i++){
     p = geoP(ro, rd, t);
     h = map(p);
-    vec2 bd = bulletDist(p);
-    bmin = min(bmin, bd.y);
-    if (bd.x < h.x) h = vec2(bd.x, 99.);
+    vec4 bd = bulletDist(p);
+    bmin = min(bmin, bd.y); emin = min(emin, bd.z);
+    if (bd.x < h.x) h = vec2(bd.x, 99. + bd.w);
     float fp = KSIGN > 0. ? abs(sin(t)) : sinh(t);
     if (h.x < .0003 + fp*1.5/uRes.y) { hit = true; break; }
     if (t > MAX_T) break;
     t += h.x*.9;
   }
   vec3 col = fogColor(ld);
-  if (hit && h.y > 98.) col = BULLET_COL*5.;
+  if (hit && h.y > 98.) col = h.y > 99.5 ? ENEMY_COL*2.2 : BULLET_COL*5.;
   else if (hit) {
     p = knorm(p);
     vec4 n = calcNormal(p);
@@ -559,7 +565,7 @@ void main(){
     col = alb*(dif*1.4/(1.+dl*dl*.6) + .35*ao + .25*(.5+.5*n.y)) + alb*emit + fr*.15;
     col = mix(fogColor(ld), col, exp(-FOG_DENS*t));
   }
-  col += BULLET_COL*exp(-max(bmin, 0.)*.6)*1.2;
+  col += BULLET_COL*exp(-max(bmin, 0.)*.6)*1.2 + ENEMY_COL*exp(-max(emin, 0.)*1.5)*.9;
   col = applyGun(col, lo, ld);
   fragColor = vec4(post(col, gl_FragCoord.xy), 1);
 }`;

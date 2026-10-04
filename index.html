@@ -17,29 +17,58 @@
   #toast { position: fixed; left: 50%; bottom: 22%; transform: translateX(-50%); font-size: 18px; padding: 8px 18px; background: rgba(0,0,0,.55); border-radius: 6px; opacity: 0; transition: opacity .3s; pointer-events: none; }
   #hurt { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, rgba(255,0,0,0) 40%, rgba(255,0,0,.55)); }
 
-  /* map menu: a column on the left, the world keeps rendering on the right */
-  #menu { position: fixed; left: 0; top: 0; bottom: 0; width: 400px; max-width: 100vw; box-sizing: border-box; padding: 28px 22px;
-          background: linear-gradient(90deg, rgba(8,6,20,.94) 70%, rgba(8,6,20,.0)); display: flex; flex-direction: column; gap: 10px;
-          transform: translateX(-105%); transition: transform .25s; overflow-y: auto; }
-  #menu.open { transform: none; }
-  #menu h1 { font-size: 44px; margin: 0; letter-spacing: 10px; background: linear-gradient(90deg,#7df,#f7d,#fd7); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  #menu .lead { font-size: 13px; opacity: .7; margin: 0 0 8px; }
-  .map { display: flex; gap: 12px; align-items: flex-start; text-align: left; width: 92%; padding: 10px 12px; border: 1px solid rgba(255,255,255,.12);
-         border-radius: 8px; background: rgba(255,255,255,.04); color: inherit; font: inherit; cursor: pointer; transition: background .15s, border-color .15s; }
-  .map:hover { background: rgba(120,180,255,.14); border-color: rgba(140,200,255,.5); }
-  .map.active { border-color: #fd7; background: rgba(255,220,120,.1); }
-  .map .num { font-size: 20px; font-weight: bold; opacity: .6; min-width: 16px; }
-  .map b { display: block; font-size: 15px; }
-  .map small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 11px; opacity: .65; margin-top: 3px; line-height: 1.35; }
-  #playBtn { width: 92%; margin-top: 6px; padding: 12px; font: inherit; font-size: 16px; font-weight: bold; letter-spacing: 2px; color: #120a20; border: 0; border-radius: 8px;
+  /* main menu: full screen over the still-rendering world; map cards on the left, the selected map on the right */
+  #menu { font-family: system-ui, 'Segoe UI', sans-serif; position: fixed; inset: 0; box-sizing: border-box; padding: 22px 30px 14px; display: grid; grid-template-rows: auto auto 1fr auto; gap: 14px;
+          background: radial-gradient(ellipse at 70% 40%, rgba(16,10,40,.72), rgba(6,4,16,.93) 70%); opacity: 0; pointer-events: none; transition: opacity .2s; }
+  #menu.open { opacity: 1; pointer-events: auto; }
+  .mtop { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; }
+  #menu h1 { font-size: 46px; margin: 0; letter-spacing: 12px; background: linear-gradient(90deg,#7df,#f7d,#fd7); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .tagline { font-size: 14px; opacity: .65; }
+  #prep { font-size: 12px; opacity: .55; }
+  #ver { margin-left: auto; font-size: 11px; opacity: .45; }
+  .mbody { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 22px; min-height: 0; }
+  #mapList { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; align-content: start; overflow-y: auto; padding: 4px; }
+  .card { position: relative; display: flex; flex-direction: column; text-align: left; padding: 0; border: 2px solid rgba(255,255,255,.1); border-radius: 12px; overflow: hidden;
+          background: rgba(255,255,255,.04); color: inherit; font: inherit; cursor: pointer; transition: transform .12s, border-color .12s, background .12s; }
+  .card:hover { transform: translateY(-2px); border-color: rgba(140,200,255,.55); }
+  .card.sel { border-color: #fd7; background: rgba(255,220,120,.08); box-shadow: 0 0 0 1px #fd7, 0 8px 30px rgba(0,0,0,.4); }
+  .card .thumb { aspect-ratio: 16 / 9; background: #223 center / cover no-repeat; }
+  .card .num { position: absolute; left: 8px; top: 8px; width: 26px; height: 26px; border-radius: 6px; background: rgba(0,0,0,.6); display: grid; place-items: center; font-weight: bold; font-size: 14px; }
+  .card .now { position: absolute; right: 8px; top: 8px; font-size: 10px; letter-spacing: 1px; padding: 3px 7px; border-radius: 5px; background: #fd7; color: #210; font-weight: bold; display: none; }
+  .card.cur .now { display: block; }
+  .card .ctxt { padding: 9px 12px 11px; }
+  .card b { display: block; font-size: 16px; margin-bottom: 5px; }
+  .tags { display: flex; gap: 5px; flex-wrap: wrap; }
+  .tag { font-size: 10.5px; padding: 2px 7px; border-radius: 10px; background: rgba(120,200,255,.14); border: 1px solid rgba(120,200,255,.25); white-space: nowrap; }
+  .tag.fight { background: rgba(255,90,90,.16); border-color: rgba(255,110,110,.35); }
+  #detail { display: flex; flex-direction: column; gap: 12px; min-height: 0; padding: 16px; border-radius: 14px; background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.1); }
+  #dScroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 4px; }
+  #dThumb { height: 150px; border-radius: 9px; background: #223 center / cover no-repeat; flex: none; }
+  #dName { font-size: 24px; font-weight: bold; }
+  #dName span { opacity: .45; margin-right: 8px; }
+  #dDesc { font-size: 13px; line-height: 1.5; opacity: .82; margin: 0; }
+  #detail h3 { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; opacity: .5; margin: 4px 0 6px; font-weight: normal; }
+  #dModes { display: flex; flex-direction: column; gap: 6px; }
+  .modeBtn { text-align: left; padding: 9px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.05); color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+  .modeBtn:hover { border-color: rgba(140,200,255,.6); }
+  .modeBtn.sel { border-color: #7df; background: rgba(120,220,255,.16); }
+  .modeBtn.sel::before { content: '● '; color: #7df; }
+  .modeBtn:not(.sel)::before { content: '○ '; opacity: .5; }
+  #dSet .srow { grid-template-columns: 110px 1fr; }
+  #dSet .srow .val { grid-column: 2; font-size: 11px; opacity: .7; margin-top: -4px; }
+  #dHelp { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.6; opacity: .75; }
+  .dplay { display: flex; gap: 8px; flex: none; }
+  #playBtn { flex: 1; padding: 13px; font: inherit; font-size: 17px; font-weight: bold; letter-spacing: 2px; color: #120a20; border: 0; border-radius: 9px;
              background: linear-gradient(90deg,#7df,#f7d); cursor: pointer; }
-  #upd { width: 92%; box-sizing: border-box; padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(140,255,170,.55); background: rgba(80,200,120,.13); font-size: 13px; }
+  #playBtn:hover { filter: brightness(1.1); }
+  #restartBtn { padding: 0 14px; font: inherit; font-size: 13px; border-radius: 9px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.06); color: inherit; cursor: pointer; }
+  #menu .keys { font-size: 11px; opacity: .5; line-height: 1.7; }
+  #upd { box-sizing: border-box; padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(140,255,170,.55); background: rgba(80,200,120,.13); font-size: 13px; display: flex; gap: 14px; align-items: center; }
   #upd[hidden] { display: none; }
   #upd b { color: #9f9; }
-  #upd small { display: block; opacity: .7; margin: 4px 0 8px; line-height: 1.4; white-space: pre-line; }
+  #upd small { flex: 1; opacity: .75; line-height: 1.4; white-space: pre-line; }
   #updBtn { padding: 7px 14px; font: inherit; font-weight: bold; border: 0; border-radius: 6px; background: #8f9; color: #062; cursor: pointer; }
-  #ver { font-size: 10px; opacity: .4; }
-  #menu .keys { font-size: 11px; opacity: .55; line-height: 1.7; margin-top: 8px; }
+  @media (max-width: 900px) { .mbody { grid-template-columns: 1fr; overflow-y: auto; } #menu h1 { font-size: 32px; } }
 
   /* live settings of the current map */
   #wset { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 10px 16px; background: rgba(0,0,0,.45); border-radius: 10px;
@@ -77,17 +106,26 @@
 <canvas id="mini" width="300" height="300"></canvas>
 <div id="fade"></div>
 <div id="menu">
-  <h1>WYMIARY</h1>
-  <p class="lead">wybierz mapę <span id="prep"></span></p>
+  <div class="mtop"><h1>WYMIARY</h1><span class="tagline">strzelanka w przestrzeniach, które łamią intuicję</span><span id="prep"></span><span id="ver"></span></div>
   <div id="upd" hidden><b></b><small></small><button id="updBtn">⟳ Aktualizuj teraz</button></div>
-  <div id="mapList" style="display:flex;flex-direction:column;gap:8px"></div>
-  <button id="playBtn">▶ GRAJ</button>
-  <div class="keys">
-    WASD ruch · mysz rozglądanie · LPM strzał · Spacja skok · Shift bieg<br>
-    1–7 szybki wybór mapy · Esc / M menu · P projekcja · [ ] rozdzielczość<br>
-    kółko myszy FOV · N noclip · V dźwięk · F11 pełny ekran
+  <div class="mbody">
+    <div id="mapList"></div>
+    <div id="detail"><div id="dScroll">
+      <div id="dThumb"></div>
+      <div id="dName"></div>
+      <div class="tags" id="dTags"></div>
+      <p id="dDesc"></p>
+      <div id="dModesWrap"><h3>Tryb gry</h3><div id="dModes"></div></div>
+      <div id="dSetWrap"><h3>Ustawienia mapy</h3><div id="dSet"></div></div>
+      <div><h3>Na tej mapie</h3><ul id="dHelp"></ul></div>
+    </div>
+      <div class="dplay"><button id="playBtn">▶ GRAJ</button><button id="restartBtn" title="Zacznij tę mapę od nowa">↻ od nowa</button></div>
+    </div>
   </div>
-  <div id="ver"></div>
+  <div class="keys">
+    ← → ↑ ↓ wybór mapy · Enter graj · W grze: WASD ruch · mysz rozglądanie · LPM strzał · Spacja skok · Shift bieg ·
+    1–7 szybka zmiana mapy · Esc / M menu · P projekcja · [ ] rozdzielczość · kółko FOV · N noclip · V dźwięk · F11 pełny ekran
+  </div>
 </div>
 <div id="err"></div>
 
@@ -100,6 +138,7 @@
 <script src="js/audio.js"></script>
 <script src="js/net.js"></script>
 <script src="js/monsters.js"></script>
+<script src="js/enemies.js"></script>
 <script src="js/worlds/building.js"></script>
 <script src="js/compass4d.js"></script>
 <script src="js/worlds/tesseract.js"></script>

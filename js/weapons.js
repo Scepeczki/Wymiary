@@ -164,6 +164,19 @@
       gl.uniform1fv(p.u('uBulletR'), rad);
       gl.uniform1i(p.u('uBulletN'), n);
     }
+    // For the 4D and curved kernels (all 4 components are the position): enemy projectiles get a negative radius.
+    static uploadSigned(gl, p, lists) {
+      const pos = new Float32Array(MAX * 4), rad = new Float32Array(MAX);
+      let n = 0;
+      for (const [list, enemy] of lists) {
+        const n0 = n;
+        n = list.pack(pos, rad, n, null);
+        if (enemy) for (let i = n0; i < n; i++) rad[i] = -rad[i];
+      }
+      gl.uniform4fv(p.u('uBullets'), pos);
+      gl.uniform1fv(p.u('uBulletR'), rad);
+      gl.uniform1i(p.u('uBulletN'), n);
+    }
     setUniforms(gl, p) { Bullets.upload(gl, p, [[this, null]]); }
     // For worlds that render with retarded time (RETARDED kernel): per bullet its current (or death) position,
     // velocity, birth time, death time, reference time of that position and gravity. The shader evaluates

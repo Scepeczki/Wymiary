@@ -185,7 +185,7 @@
       document.getElementById('hudSub').textContent = w.subtitle || '';
       document.getElementById('help').textContent = (w.help || []).join('\n') +
         '\n\nLPM strzał · 1–' + E.worlds.length + ' mapy · Esc / M menu\nP projekcja · [ ] rozdz.';
-      if (E.onWorldChanged) E.onWorldChanged(w);
+      if (E.onWorldChanged) E.onWorldChanged(w, opts);
       fade.style.opacity = 0;
       E._switching = false;
     };
@@ -213,7 +213,7 @@
     });
     window.addEventListener('keydown', e => {
       if (e.code === 'Tab' || e.code === 'Space') e.preventDefault();
-      if (!E.locked && !e.code.startsWith('Digit')) return;   // menu open: only map shortcuts
+      if (!E.locked) return;   // menu open: the menu handles the keys
       E.keys[e.code] = true;
       if (e.repeat) return;
       if (e.code.startsWith('Digit')) {

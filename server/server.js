@@ -8,7 +8,7 @@ const http = require('http'), fs = require('fs'), path = require('path'), crypto
 const ROOT = path.join(__dirname, '..');
 const args = process.argv.slice(2);
 const PORT = +(args[args.indexOf('--port') + 1] || 0) || 8080;
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.ico': 'image/x-icon', '.css': 'text/css', '.json': 'application/json' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon', '.css': 'text/css', '.json': 'application/json' };
 
 // ---------------- distribution: the files a player's copy of the game consists of ----------------
 // Other players' launchers fetch /api/manifest and download the files whose hash differs — so whatever version

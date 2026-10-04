@@ -69,6 +69,21 @@ Postęp widać w zakładce **Actions** repozytorium, gotowe wydania w **Releases
 6. **Wolne światło** — szczególna teoria względności z regulowanym c (patrz niżej).
 7. **Arena pętli** — długa mapa dwóch baz, prawie wszędzie zapętlona; bot albo gra sieciowa (patrz niżej).
 
+**Na każdej mapie da się grać.** Menu (Esc) pokazuje karty map z podglądem. Po wybraniu mapy po prawej widać opis,
+**tryb gry**, suwaki mapy i jej klawisze; przycisk **GRAJ** albo Enter uruchamia grę. Strzałki i 1–7 wybierają mapę,
+dwuklik na karcie od razu ją uruchamia.
+
+- Korytarze K i Wolne światło: tryb *Z potworami*. Arena pętli: bot albo gra sieciowa.
+- Tesserakt, H³, S³ i Pętla: tryb **Walka: fale potworów** (`js/enemies.js`). Te same blokowe zombie chodzą
+  i strzelają w geometrii danej mapy. Fala N ma N+1 potworów (najwyżej 8), a kolejne fale są szybsze i celniejsze.
+  - W 3-torusie widać nieskończenie wiele kopii każdego potwora.
+  - W 4D potwory podchodzą przez oś W; na kompasie są czerwonymi kropkami z kreską do Twojego poziomu W.
+  - W H³ i S³ ich pociski lecą po geodezyjnych; w S³ chybiony pocisk okrąża świat.
+  - Śmierć zaczyna grę od fali 1; rekord fali widać u góry ekranu.
+  - Każdy potwór ma lokalny układ współrzędnych przy stopach. SI, trafienia i rysowanie liczą się w metrach przez
+    dokładną mapę logarytmiczną danej przestrzeni; przeszkody i linia wzroku idą przez sondy GPU.
+- Podglądy map to `assets/maps/<n>.jpg` (zrzuty z `tools/dev/shotserver.js`). Test fal: `node tools/dev/swarm.js`.
+
 ## Korytarze K
 
 Budynek w przestrzeni o metryce konforemnie płaskiej g = e^{2φ}·δ, φ = φ_globalne + φ_bańki:

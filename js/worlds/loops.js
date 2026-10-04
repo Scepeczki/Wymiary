@@ -748,6 +748,7 @@ vec3 material(float id, vec3 p, vec3 n, inout float emit){
   const world = {
     name: 'Arena pętli',
     subtitle: 'Długa mapa: dwie bazy i trzy ścieżki, w których prawie każde miejsce jest zapętlone — bazy i węzły ciągną się w bok bez końca, schody Penrose\'a (wchodzisz w górę, a jesteś na tym samym poziomie), budka większa w środku, sala ze studnią i mostkiem, korytarz z trzema sklejonymi bocznymi przejściami, hala bez podłogi i plac-torus. Pojedynek z botem albo gra sieciowa z drugim graczem.',
+    tags: ['pojedynek', 'bot', 'gra sieciowa'],
     help: ['WASD ruch · Spacja skok · Shift bieg', 'LPM strzał · R przeładuj (12 naboi)', 'mapka: kolorowe linie = sklejone miejsca', 'Esc — menu (tryb gry)', 'N noclip'],
     modes: [{ label: 'Zwiedzanie', opts: { mode: 0 } }, { label: 'Bot: łatwy', opts: { mode: 1 } }, { label: 'Bot: trudny', opts: { mode: 2 } }, { label: 'Gra sieciowa', opts: { mode: 3 } }],
     shader: () => WG.euclid(code, '#define PORTALS\n#define FOG_DENS .011\n#define MAX_T 170.\n#define SUN_DIR normalize(vec3(.45,.8,.25))\n'),

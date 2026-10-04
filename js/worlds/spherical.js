@@ -2,9 +2,10 @@
 // It is tiled by the 8 cubes of a tesseract, whose angles here are 120°, so THREE cubes meet at each edge.
 // Rays that go straight ahead come back from behind; objects near your antipode look gigantic.
 (function () {
-  const K = 1;
+  const K = 1, EN_M = 0.12 / 1.6;   // world units per metre (eye height 0.12 = 1.6 m)
 
   const code = `
+${WSwarm.glslMat(true, EN_M, false)}
 mat2 rot(float a){ float c=cos(a), s=sin(a); return mat2(c,-s,s,c); }
 vec4 canon(vec4 p){                       // |coords| sorted descending (the 8-cell's symmetry)
   vec4 a = abs(p);
@@ -34,10 +35,14 @@ vec2 map(vec4 p){
   // a small cube sitting at your antipode: it fills half the sky
   vec4 q = p; q.xz = rot(uTime*.3)*q.xz;
   if (q.w < -.5) r = opU(r, vec2(sdBox(q.xyz - vec3(0,.05,0), vec3(.04)), 4.));
+#ifndef PROBE
+  r = opU(r, enemies(p));
+#endif
   return r;
 }
 vec3 fogColor(vec3 d){ return mix(vec3(.75,.8,.95), vec3(.55,.65,.9), .5+.5*d.y); }
 vec3 material(float id, vec4 p, vec4 n, inout float emit){
+  if (id > 19.5) return enemyColor(id, p, n, emit);
   vec4 c = canon(p);
   if (id < 1.5) {
     vec3 a = abs(vec3(p.x, p.z, p.w));
@@ -56,30 +61,51 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
   const world = {
     name: 'Przestrzeń sferyczna',
     subtitle: 'S³ o krzywiźnie +1 — skończony wszechświat bez brzegu. Kafelkowany ośmioma sześcianami tesseraktu (po 3 wokół krawędzi). Idź prosto, a wrócisz z drugiej strony. Mały sześcian na antypodzie wygląda jak gigant.',
-    help: ['WASD ruch · Spacja skok', 'strzel prosto — pocisk okrąży świat i trafi Cię w plecy', 'podłoga: 6 kolorowych pokoi', 'idź prosto wzdłuż kolorowych bloków', 'N noclip (Spacja/Ctrl — wysokość)'],
+    tags: ['K = +1', 'S³', 'potwory'],
+    help: ['WASD ruch · Spacja skok', 'strzel prosto — pocisk okrąży świat i trafi Cię w plecy', 'podłoga: 6 kolorowych pokoi', 'idź prosto wzdłuż kolorowych bloków', 'walka: chybiony pocisk potwora okrąża świat — uważaj na plecy', 'N noclip (Spacja/Ctrl — wysokość)'],
     shader: () => WG.curved(K, code, '#define MAX_T 6.\n#define FOG_DENS .16\n'),
     bullets: new WBullets(WBallistics.curved(K, { speed: 1.2, gravity: 0, radius: 0.006, life: 7 }), {
+      hitTest: q => swarm.hitTest(q),
       selfDist: b => Math.acos(WM.clamp(WM.dot(b, world.player.camera()[3]), -1, 1)) - 0.03,
     }),
     aim() { return this.player.aim(); },
     reverb: 0.05,
     soundArrivals(src) { return WAudio.curvedArrivals(K, 1.6 / 0.12, src, this.player.camera()); },
-    enter() {
+    enter(opts = {}) {
       if (!this.player) this.player = new WCurvedPlayer(K, { eye: 0.12, radius: 0.035, speed: 0.35, run: 0.9, jump: 0.8, gravity: 3 });
       this.player.reset();
       this.dist = 0;
+      WSwarm.startMode(this, swarm, opts);
     },
     update(dt, look) {
       const P0 = this.player.M[3].slice();
       this.player.update(dt, look);
       const P1 = this.player.M[3];
       this.dist = (this.dist || 0) + Math.acos(WM.clamp(WM.dot(P0, P1), -1, 1));
+      swarm.update(dt);
     },
-    setUniforms(gl, prog) { this.player.setUniforms(gl, prog); },
+    setUniforms(gl, prog) { this.player.setUniforms(gl, prog); swarm.setUniforms(gl, prog); },
+    setBulletUniforms(gl, p) { WBullets.uploadSigned(gl, p, [[this.bullets, false], [swarm.shots, true]]); },
+    // monsters appear on the floor plane around you, facing you
+    spawn(i, wave) {
+      const r = 1.0 + Math.random() * 1.6;
+      let M = WM.mulMat(this.player.M, WM.planeRot(4, 2, 0, i * 2.4 + Math.random() * 1.2));
+      M = WM.mulMat(M, WM.ktrans(K, 2, r));
+      M = WM.mulMat(M, WM.planeRot(4, 2, 0, Math.PI));
+      WM.korthonormalize(K, M);
+      return swarm.sp.place(M);
+    },
+    playerPoints() {
+      const p = this.player, h = p.h;
+      return { eye: p.camera()[3], body: [p.local(0, h, 0), p.local(0, Math.max(0.01, h - 0.8 * EN_M), 0), p.local(0, Math.max(0.01, h - 1.3 * EN_M), 0)] };
+    },
     stats() {
       const P = this.player.M[3], home = Math.acos(WM.clamp(P[3], -1, 1));
       return `odległość od startu: ${home.toFixed(2)} (max π = 3.14) · przebyto: ${(this.dist || 0).toFixed(1)} · obwód świata 2π = 6.28`;
     },
   };
+  const swarm = new WSwarm(world, WSwarm.spaces.curved(K, EN_M), {
+    range: 28, shotModel: WBallistics.curved(K, { speed: 9 * EN_M, gravity: 0, radius: 0.009, life: 9 }),
+  });
   WE.register(world);
 })();

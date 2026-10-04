@@ -4,9 +4,10 @@
   // Klein half-size a of the cube with 72° dihedral angles: cos72 = a^2/(1-a^2)
   const A = Math.sqrt(Math.cos(2 * Math.PI / 5) / (1 + Math.cos(2 * Math.PI / 5)));
   const CH = 1 / Math.sqrt(1 - A * A), SH = A * CH;   // cosh d, sinh d where tanh d = A
-  const K = -1;
+  const K = -1, EN_M = 0.17 / 1.6;   // world units per metre (eye height 0.17 = 1.6 m)
 
   const code = `
+${WSwarm.glslMat(true, EN_M, false)}
 const float CH = ${CH.toFixed(7)}, SH = ${SH.toFixed(7)};
 vec4 fold(vec4 p, out float nref){
   nref = 0.;
@@ -35,10 +36,14 @@ vec2 map(vec4 p){
   float lamp = kdist(q, vec4(0, sinh(.4), 0, cosh(.4))) - .035;
   r = opU(r, vec2(lamp, 4.));
 #endif
+#ifndef PROBE
+  r = opU(r, enemies(p));
+#endif
   return r;
 }
 vec3 fogColor(vec3 d){ return mix(vec3(.02,.02,.05), vec3(.1,.05,.15), .5+.5*d.y); }
 vec3 material(float id, vec4 p, vec4 n, inout float emit){
+  if (id > 19.5) return enemyColor(id, p, n, emit);
   float nr; vec4 q = fold(p, nr);
   vec3 f = faceDist(q);
   if (id < 1.5) {
@@ -55,13 +60,14 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
   const world = {
     name: 'Przestrzeń hiperboliczna',
     subtitle: 'H³ o krzywiźnie −1. Plaster miodu {4,3,5}: sześcienne pokoje o kątach prostych, ale wokół każdej krawędzi stoi PIĘĆ sześcianów. Przestrzeń rośnie wykładniczo z odległością.',
-    help: ['WASD ruch · Spacja skok', 'pociski lecą po geodezyjnych H³ — rozbiegają się wykładniczo', 'policz sześciany wokół narożnika podłogi (5!)', 'N noclip (Spacja/Ctrl — wysokość)'],
+    tags: ['K = −1', 'H³', 'potwory'],
+    help: ['WASD ruch · Spacja skok', 'pociski lecą po geodezyjnych H³ — rozbiegają się wykładniczo', 'policz sześciany wokół narożnika podłogi (5!)', 'walka: ich fioletowe pociski też lecą po geodezyjnych', 'N noclip (Spacja/Ctrl — wysokość)'],
     shader: () => WG.curved(K, code, '#define MAX_T 7.\n#define FOG_DENS .42\n'),
-    bullets: new WBullets(WBallistics.curved(K, { speed: 1.4, gravity: 0.35, radius: 0.007 })),
+    bullets: new WBullets(WBallistics.curved(K, { speed: 1.4, gravity: 0.35, radius: 0.007 }), { hitTest: q => swarm.hitTest(q) }),
     aim() { return this.player.aim(); },
     reverb: 0.05,
     soundArrivals(src) { return WAudio.curvedArrivals(K, 1.6 / 0.17, src, this.player.camera()); },
-    enter() {
+    enter(opts = {}) {
       if (!this.player) {
         this.player = new WCurvedPlayer(K, { eye: 0.17, radius: 0.045, speed: 0.3, run: 0.7 });
         // keep the player inside the fundamental cell: when crossing a face, apply the
@@ -79,6 +85,8 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
               };
               p.M = p.M.map(f);
               this.bullets.transform(f);   // bullets live in the same coordinates: move them along
+              swarm.shots.transform(f);
+              for (const m of swarm.list) swarm.sp.transform(m.g, f);
               this.crossed = (this.crossed || 0) + 1;
             }
           }
@@ -86,10 +94,28 @@ vec3 material(float id, vec4 p, vec4 n, inout float emit){
       }
       this.player.reset();
       this.crossed = 0;
+      WSwarm.startMode(this, swarm, opts);
     },
-    update(dt, look) { this.player.update(dt, look); },
-    setUniforms(gl, prog) { this.player.setUniforms(gl, prog); },
+    update(dt, look) { this.player.update(dt, look); swarm.update(dt); },
+    setUniforms(gl, prog) { this.player.setUniforms(gl, prog); swarm.setUniforms(gl, prog); },
+    setBulletUniforms(gl, p) { WBullets.uploadSigned(gl, p, [[this.bullets, false], [swarm.shots, true]]); },
+    // monsters appear on the floor plane around you, facing you
+    spawn(i, wave) {
+      const r = 1.1 + Math.random() * 0.7;
+      let M = WM.mulMat(this.player.M, WM.planeRot(4, 2, 0, i * 2.4 + Math.random() * 1.2));
+      M = WM.mulMat(M, WM.ktrans(K, 2, r));
+      M = WM.mulMat(M, WM.planeRot(4, 2, 0, Math.PI));
+      WM.korthonormalize(K, M);
+      return swarm.sp.place(M);
+    },
+    playerPoints() {
+      const p = this.player, h = p.h;
+      return { eye: p.camera()[3], body: [p.local(0, h, 0), p.local(0, Math.max(0.01, h - 0.8 * EN_M), 0), p.local(0, Math.max(0.01, h - 1.3 * EN_M), 0)] };
+    },
     stats() { return `przekroczone ściany komórek: ${this.crossed}`; },
   };
+  const swarm = new WSwarm(world, WSwarm.spaces.curved(K, EN_M), {
+    range: 22, shotModel: WBallistics.curved(K, { speed: 9 * EN_M, gravity: 0, radius: 0.012, life: 6 }),
+  });
   WE.register(world);
 })();

@@ -290,6 +290,7 @@ vec3 light(vec3 p, vec3 n, vec3 rd, vec3 alb, float ao){
   const world = {
     name: 'Korytarze K',
     subtitle: 'Budynek w zakrzywionej przestrzeni: suwakiem ustawiasz krzywiznę K całej mapy (K<0 hiperboliczna, K>0 sferyczna). W trybie z potworami każdy potwór nosi bańkę zakrzywionej przestrzeni — pomarańczowe: K>0 (soczewka), niebieskie: K<0 — a ich pociski to latające soczewki. Twoje pociski też się w nich zakrzywiają.',
+    tags: ['zmienna krzywizna K', 'potwory', 'suwak K'],
     help: ['WASD ruch · Spacja skok · Shift bieg', 'Q / E — K całej mapy · X — płasko', 'potwory: 3 trafienia', 'Esc — suwaki i tryby w menu', 'N noclip'],
     modes: [{ label: 'Spokój', opts: { zombies: false } }, { label: 'Z potworami', opts: { zombies: true } }],
     shader: () => WG.euclid(code, '#define CONFORMAL\n#define CUSTOM_LIGHT\n#define FOG_DENS .03\n#define MAX_T 90.\n'),
