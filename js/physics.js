@@ -4,7 +4,7 @@
 (function () {
   // body spheres (offsets below the eye); the lowest one floats above the feet so low steps are climbed
   // by the ground probe (anything up to STEP high with a floor-like normal).
-  const EYE = 1.6, RADIUS = 0.33, SPHERES = [0.25, 0.8, 1.05], STEP = 0.45;
+  const EYE = 1.6, RADIUS = 0.33, SPHERES = [0.25, 0.8, 1.05], STEP = 0.45, H = 0.01;
 
   class Player {
     constructor(n, opts = {}) {
@@ -23,6 +23,7 @@
       this.frame = horiz.map(a => { const v = WM.vec(n); v[a] = 1; return v; });
       WM.rotFrame(this.frame, 1, 0, yaw); // yaw: forward towards right
       this.grounded = false; this.flying = false;
+      this.snap = null;                        // probes of another place
     }
     get right() { return this.frame[0]; }
     get forward() { return this.frame[1]; }
@@ -80,7 +81,10 @@
       const accel = this.grounded || this.flying ? 14 : 3;
       const k = 1 - Math.exp(-accel * dt);
       for (let i = 0; i < n; i++) if (i !== 1) this.vel[i] += (wish[i] * speed - this.vel[i]) * k;
-      if (this.flying) this.vel[1] *= Math.exp(-dt * 1.2);
+      // SpaceMouse lifted / pushed down (analog moveZ): fly at that speed
+      const az = E.analog.moveZ || 0;
+      if (Math.abs(az) > 0.02 && !(this.grounded && az < 0)) { this.flying = true; this.vel[1] += (az * speed - this.vel[1]) * k; }
+      else if (this.flying) this.vel[1] *= Math.exp(-dt * 1.2);
       else this.vel[1] -= o.gravity * dt;
       if (this.grounded && E.keys.Space) { this.vel[1] = o.jump; this.grounded = false; this.flying = false; }
 
@@ -96,49 +100,64 @@
       }
       if (this.flying && this.grounded && this.vel[1] <= 0.5) this.flying = false;   // landed
       if (this.pos[1] < o.respawnY) { this.reset(o.spawn || [0, EYE, 0]); E.toast('Respawn'); }
+      this.probeAhead();
     }
 
+    // the body's probe points at pos: the sphere centres, then the foot; each followed by n points H further along
+    // each axis (the gradient)
+    bodyPoints(pos) {
+      const n = this.n, out = [];
+      const foot = pos.slice(); foot[1] -= EYE - STEP;
+      for (const c of [...SPHERES.map(off => { const c = pos.slice(); c[1] -= off; return c; }), foot]) {
+        out.push(c);
+        for (let a = 0; a < n; a++) { const q = c.slice(); q[a] += H; out.push(q); }
+      }
+      return out;
+    }
+
+    // Collision against the distance field. Normally (WE.asyncProbes) with the probes of the previous frame: the
+    // distance at the body point now is extrapolated from where it was measured, d + n·(now − then) — exact for flat
+    // walls and floors, and the next frame measures again. Waits for the GPU (WE.probe) only without a recent
+    // measurement (first frame, respawn, a jump of more than 1 m).
     collide() {
-      const n = this.n, h = 0.01;
+      const n = this.n, s = this.snap;
+      const lagged = WE.asyncProbes && s && WE.time - s.t < 0.25 && WM.len(WM.sub(this.pos, s.pos)) < 1;
       for (let iter = 0; iter < 2; iter++) {
-        const centers = SPHERES.map(off => { const c = this.pos.slice(); c[1] -= off; return c; });
-        const foot = this.pos.slice(); foot[1] -= EYE - STEP;
-        const pts = [];
-        for (const c of [...centers, foot]) {
-          pts.push(c);
-          for (let a = 0; a < n; a++) { const q = c.slice(); q[a] += h; pts.push(q); }
-        }
-        const d = WE.probe(pts);
-        const gradAt = i => {
+        const pts = this.bodyPoints(this.pos), src = lagged ? s.pts : pts, d = lagged ? s.d : WE.probe(pts);
+        // distance and outward normal at body point i
+        const at = i => {
           const base = i * (n + 1), g = WM.vec(n);
-          for (let a = 0; a < n; a++) g[a] = (d[base + 1 + a] - d[base]) / h;
+          for (let a = 0; a < n; a++) g[a] = (d[base + 1 + a] - d[base]) / H;
           const l = WM.len(g);
-          return l < 1e-6 ? null : WM.scale(g, 1 / l);
+          if (l < 1e-6) return null;
+          const u = WM.scale(g, 1 / l);
+          return { d: lagged ? d[base] + WM.dot(u, WM.sub(pts[base], src[base])) : d[base], g: u };
         };
         let moved = false;
-        centers.forEach((c, si) => {
-          const d0 = d[si * (n + 1)];
-          if (!(d0 < RADIUS)) return;
-          const g = gradAt(si);
-          if (!g) return;
-          this.pos = WM.addScaled(this.pos, g, RADIUS - d0);
-          const vn = WM.dot(this.vel, g);
-          if (vn < 0) this.vel = WM.addScaled(this.vel, g, -vn);
-          if (g[1] > 0.55) this.grounded = true;
+        for (let si = 0; si < SPHERES.length; si++) {
+          const f = at(si);
+          if (!f || !(f.d < RADIUS)) continue;
+          this.pos = WM.addScaled(this.pos, f.g, RADIUS - f.d);
+          const vn = WM.dot(this.vel, f.g);
+          if (vn < 0) this.vel = WM.addScaled(this.vel, f.g, -vn);
+          if (f.g[1] > 0.55) this.grounded = true;
           moved = true;
-        });
+        }
         // ground probe: keeps the feet on the floor and climbs steps
-        const df = d[centers.length * (n + 1)];
-        if (df < STEP + 0.03 && this.vel[1] <= 0.5) {
-          const g = gradAt(centers.length);
-          if (g && g[1] > 0.6) {
-            if (df < STEP) { this.pos[1] += STEP - df; moved = true; }
-            if (this.vel[1] < 0) this.vel[1] = 0;
-            this.grounded = true;
-          }
+        const f = at(SPHERES.length);
+        if (f && f.d < STEP + 0.03 && this.vel[1] <= 0.5 && f.g[1] > 0.6) {
+          if (f.d < STEP) { this.pos[1] += STEP - f.d; moved = true; }
+          if (this.vel[1] < 0) this.vel[1] = 0;
+          this.grounded = true;
         }
         if (!moved) break;
       }
+    }
+    // measure the field around the body where it ended this frame (the result is used in a later frame)
+    probeAhead() {
+      if (!WE.asyncProbes) return;
+      const pos = this.pos.slice(), pts = this.bodyPoints(pos), t = WE.time;
+      WE.probeLater(pts, d => { this.snap = { pts, d, pos, t }; });
     }
 
     // uniforms for the 3D Euclidean kernel
@@ -215,7 +234,9 @@
         if (fi) { this.flying = true; this.vh = WM.clamp(this.vh + fi * 2.5 * unit, -9 * unit, 9 * unit); }
         const ground = this.h <= o.eye + 1e-4;
         if (ground && E.keys.Space) { this.vh = o.jump; this.flying = false; }
-        if (this.flying) this.vh *= Math.exp(-dt * 1.2);
+        const az = E.analog.moveZ || 0;                // SpaceMouse lifted / pushed down: fly at that speed
+        if (Math.abs(az) > 0.02 && !(ground && az < 0)) { this.flying = true; this.vh += (az * 5 * unit - this.vh) * (1 - Math.exp(-14 * dt)); }
+        else if (this.flying) this.vh *= Math.exp(-dt * 1.2);
         else this.vh -= o.gravity * dt;
         this.h += this.vh * dt;
         const top = K > 0 ? 1.3 : 2.5;

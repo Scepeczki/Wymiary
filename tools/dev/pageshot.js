@@ -11,8 +11,10 @@ const srv = http.createServer((req, res) => {
   fs.readFile(f, (e, d) => { if (e) { res.statusCode = 404; return res.end(); } res.setHeader('Content-Type', types[path.extname(f)] || 'text/plain'); res.end(d); });
 }).listen(8766);
 const proc = cp.spawn(brave, [`--app=http://localhost:8766/index.html?${query}`, `--user-data-dir=${process.env.TEMP}\\wymiary-pageshot-profile`,
-  '--remote-debugging-port=9334', '--window-position=-3000,0', '--window-size=1600,900', '--no-first-run', '--ignore-gpu-blocklist',
-  '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'], { stdio: 'ignore' });
+  // PS_POS / PS_SIZE put the window on a visible screen instead (e.g. PS_POS=0,0 PS_SIZE=3072,1728)
+  '--remote-debugging-port=9334', `--window-position=${process.env.PS_POS || '-3000,0'}`, `--window-size=${process.env.PS_SIZE || '1600,900'}`, '--no-first-run', '--ignore-gpu-blocklist',
+  '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
+  ...(process.env.PS_FLAGS ? process.env.PS_FLAGS.split(' ') : [])], { stdio: 'ignore' });
 const done = code => { try { cp.execSync(`taskkill /PID ${proc.pid} /T /F`, { stdio: 'ignore' }); } catch (e) {} srv.close(); process.exit(code); };
 setTimeout(async () => {
   try {

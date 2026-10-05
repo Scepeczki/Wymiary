@@ -252,8 +252,9 @@
         for (let i = 1; i <= 7; i++) pts.push(sp.lerp(head, m.tg.eye, i / 8));
         los.push({ m, o });
       }
-      if (pts.length) {
-        const d = WE.probe(pts).map(x => x / sp.m);
+      // (answered a frame later: monsters walk slowly, a frame of delay in their push / sight does not show)
+      if (pts.length) WE.probeLater(pts, dd => {
+        const d = dd.map(x => x / sp.m);
         for (const { m, o } of plan) {
           const d0 = d[o];
           if (!(d0 < 0.5)) { m.push = null; continue; }
@@ -261,7 +262,7 @@
           m.push = sc(g, 3 * (0.5 - d0) / gl);
         }
         for (const { m, o } of los) m.los = [1, 2, 3, 4, 5, 6, 7].every(i => !(d[o + i - 1] < 0.03));
-      }
+      });
 
       // enemy projectiles: every living player can be hit (the leader decides, see js/mp.js)
       this.shots.update(dt);

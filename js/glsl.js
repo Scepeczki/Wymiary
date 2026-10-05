@@ -175,6 +175,8 @@ void main(){
   //   CONFORMAL       — world provides vec4 metric(vec3 p) = (grad phi, phi) and float stepLimit(vec3 p);
   //                     rays follow geodesics of g = e^{2 phi} * euclidean, fog uses metric length
   //   PORTALS         — world provides bool portalStep(inout vec3 p, vec3 np) (teleports the ray when it crosses a portal)
+  //   VOLUME          — world provides vec3 volume(vec3 p, vec3 rd, float st): light emitted by glowing gas / beams along
+  //                     a step of length st (added up along the ray; keep the steps short there with CONFORMAL's stepLimit)
 //   CUSTOM_LIGHT    — world provides vec3 light(vec3 p, vec3 n, vec3 rd, vec3 alb, float ao)
   G.euclid = function (code, defs = '') {
     const common = G.header + `
@@ -304,6 +306,9 @@ void main(){
 #endif
   float t = 0., tf = 0.; vec2 h = vec2(1e9, -1.); bool hit = false, inside = true;
   float bmin = 1e9, emin = 1e9;
+#ifdef VOLUME
+  vec3 vacc = vec3(0);
+#endif
 #ifdef RETARDED
   gRT = uTime;
 #endif
@@ -352,6 +357,9 @@ void main(){
 #else
     tf += st;
 #endif
+#ifdef VOLUME
+    vacc += volume(p, rd, st)*exp(-FOG_DENS*tf);
+#endif
 #ifdef PORTALS
     vec3 np = p + rd*st;
     if (!portalStep(p, np)) p = np;      // seamless portal: the ray continues from the glued place
@@ -380,6 +388,9 @@ void main(){
     col += alb*emit;
     col = mix(skyc, col, exp(-FOG_DENS*tf));
   } else col = inside ? vec3(.06,.055,.07) : skyc;
+#ifdef VOLUME
+  col += vacc;
+#endif
   col += BULLET_COL*exp(-max(bmin, 0.)*.6)*1.2 + ENEMY_COL*exp(-max(emin, 0.)*1.5)*.9;
 #ifdef MIRROR
   col *= mirrorTint;

@@ -48,11 +48,11 @@
       void main(){ vec2 p = vec2((gl_VertexID<<1)&2, gl_VertexID&2); gl_Position = vec4(p*2.0-1.0,0.0,1.0); }`;
     E.vao = gl.createVertexArray();
 
-    // probe render target: MAX_PROBES x 1, one distance per pixel
+    // probe render target: MAX_PROBES x PROBE_ROWS, one distance per pixel (row 0: E.probe, all rows: E.probeLater)
     E.probeTex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, E.probeTex);
-    if (E.hasFloatRT) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, E.MAX_PROBES, 1, 0, gl.RGBA, gl.FLOAT, null);
-    else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, E.MAX_PROBES, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    if (E.hasFloatRT) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, E.MAX_PROBES, PROBE_ROWS, 0, gl.RGBA, gl.FLOAT, null);
+    else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, E.MAX_PROBES, PROBE_ROWS, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     E.probeFB = gl.createFramebuffer();
@@ -61,6 +61,8 @@
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     E.probeBufF = new Float32Array(E.MAX_PROBES * 4);
     E.probeBufB = new Uint8Array(E.MAX_PROBES * 4);
+    gpuQ.ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
+    E.asyncProbes = E.hasFloatRT;      // reading float pixels into a buffer object, without waiting
     return true;
   };
 
@@ -142,19 +144,31 @@
   E.probe = function (points) {
     const gl = E.gl, w = E.world, p = w.probeProg, n = Math.min(points.length, E.MAX_PROBES);
     if (!p || n === 0) return [];
-    gl.useProgram(p);
-    const a = new Float32Array(E.MAX_PROBES * 4);
+    const t0 = performance.now();
+    try { return probeNow(gl, w, p, points, n); } finally { perfAcc.probe += performance.now() - t0; perfAcc.probeN++; }
+  };
+  // the probe program evaluates uProbe[i] into pixel (i, row)
+  const probeArr = new Float32Array(64 * 4);
+  function probeRow(gl, p, points, from, n, row) {
+    probeArr.fill(0);
     for (let i = 0; i < n; i++) {
-      const q = points[i];
-      a[i * 4] = q[0]; a[i * 4 + 1] = q[1]; a[i * 4 + 2] = q[2] || 0; a[i * 4 + 3] = q[3] || 0;
+      const q = points[from + i];
+      probeArr[i * 4] = q[0]; probeArr[i * 4 + 1] = q[1]; probeArr[i * 4 + 2] = q[2] || 0; probeArr[i * 4 + 3] = q[3] || 0;
     }
-    gl.uniform4fv(p.u('uProbe'), a);
+    gl.uniform4fv(p.u('uProbe'), probeArr);
+    gl.viewport(0, row, E.MAX_PROBES, 1);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  function probeSetup(gl, w, p) {
+    gl.useProgram(p);
     gl.uniform1f(p.u('uTime'), E.time);
     if (w.setUniforms) w.setUniforms(gl, p);
     gl.bindFramebuffer(gl.FRAMEBUFFER, E.probeFB);
-    gl.viewport(0, 0, E.MAX_PROBES, 1);
     gl.bindVertexArray(E.vao);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  function probeNow(gl, w, p, points, n) {
+    probeSetup(gl, w, p);
+    probeRow(gl, p, points, 0, n, 0);
     const out = new Array(n);
     if (E.hasFloatRT) {
       gl.readPixels(0, 0, E.MAX_PROBES, 1, gl.RGBA, gl.FLOAT, E.probeBufF);
@@ -166,7 +180,142 @@
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     return out;
+  }
+
+  // ---------------- asynchronous probes ----------------
+  // E.probe makes the CPU wait for the GPU: for everything queued before it — the whole previous frame — and then
+  // for the round trip itself. E.probeLater(points, cb) instead collects the frame's requests, evaluates them all in
+  // one pass right before the frame is drawn, copies the result into a buffer object behind a fence, and calls
+  // cb(distances) in a later frame, once the GPU is done — the CPU never waits. Without float render targets (and in
+  // the headless tests, where E.probe is a JS function) cb is called at once with E.probe(points).
+  const PROBE_ROWS = 16, AP = { reqs: [], pending: [], free: [], gen: 0 };
+  E.counts = { probeWait: 0, resize: 0, skipped: 0 };     // diagnostics: forced probe waits, new render sizes, frames skipped by the limit
+  E.probeLater = function (points, cb) {
+    if (!points.length) return;
+    if (!E.asyncProbes || !E.gl || !E.world || !E.world.probeProg) { cb(E.probe(points)); return; }
+    AP.reqs.push({ points, cb, gen: AP.gen });
   };
+  // the frame's requests → one probe pass, read back into a buffer object (no waiting)
+  function probeSubmit() {
+    const gl = E.gl, w = E.world, p = w && w.probeProg;
+    if (!AP.reqs.length || !p) return;
+    while (AP.pending.length >= 3) { probeComplete(gl, AP.pending.shift(), true); E.counts.probeWait++; }   // the GPU is far behind: wait for the oldest
+    probeSetup(gl, w, p);
+    const slot = AP.free.pop() || { pbo: gl.createBuffer() }, jobs = [];
+    let row = 0;
+    for (const r of AP.reqs) {
+      const job = { cb: r.cb, gen: r.gen, rows: [] };
+      for (let i = 0; i < r.points.length && row < PROBE_ROWS; i += E.MAX_PROBES) {
+        const n = Math.min(E.MAX_PROBES, r.points.length - i);
+        probeRow(gl, p, r.points, i, n, row);
+        job.rows.push([row++, n]);
+      }
+      jobs.push(job);
+      if (row >= PROBE_ROWS) break;                    // more than PROBE_ROWS·64 points in one frame: the rest is dropped
+    }
+    AP.reqs.length = 0;
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, slot.pbo);
+    if (!slot.size) { gl.bufferData(gl.PIXEL_PACK_BUFFER, E.MAX_PROBES * PROBE_ROWS * 16, gl.STREAM_READ); slot.size = 1; }
+    gl.readPixels(0, 0, E.MAX_PROBES, row, gl.RGBA, gl.FLOAT, 0);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    slot.rows = row; slot.jobs = jobs; slot.fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    gl.flush();
+    AP.pending.push(slot);
+  }
+  const probeOut = new Float32Array(64 * PROBE_ROWS * 4);
+  function probeComplete(gl, slot, wait) {
+    if (!wait) {
+      const s = gl.clientWaitSync(slot.fence, 0, 0);
+      if (s === gl.TIMEOUT_EXPIRED || s === gl.WAIT_FAILED) return false;
+    }
+    gl.deleteSync(slot.fence); slot.fence = null;
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, slot.pbo);
+    gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, probeOut, 0, slot.rows * E.MAX_PROBES * 4);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    AP.free.push(slot);
+    for (const j of slot.jobs) {
+      if (j.gen !== AP.gen) continue;                  // asked for on another map
+      const d = [];
+      for (const [row, n] of j.rows) for (let i = 0; i < n; i++) d.push(probeOut[(row * E.MAX_PROBES + i) * 4]);
+      j.cb(d);
+    }
+    slot.jobs = null;
+    return true;
+  }
+  // results of earlier frames that the GPU has finished (start of a frame, before the world updates)
+  function probeCollect() {
+    const gl = E.gl;
+    while (AP.pending.length && probeComplete(gl, AP.pending[0], false)) AP.pending.shift();
+  }
+  E.probeReset = () => { AP.gen++; AP.reqs.length = 0; };
+
+  // ---------------- performance (HUD, the automatic resolution) ----------------
+  // per frame, averaged over half a second: frame = time between frames, cpu = the game's own work in a frame
+  // (update + issuing the draw), probe = waiting for distance probes (part of cpu), gpu = the world's draw on the GPU
+  // (EXT_disjoint_timer_query_webgl2, when the browser offers it; results arrive a few frames late)
+  E.perf = { frame: 0, cpu: 0, probe: 0, probeN: 0, gpu: 0, n: 0 };
+  const perfAcc = { frame: 0, cpu: 0, probe: 0, probeN: 0, gpu: 0, gpuN: 0, n: 0, t: 0 };
+  const gpuQ = { ext: null, pending: [], free: [] };
+  function gpuBegin(gl) {
+    if (!gpuQ.ext || gpuQ.pending.length > 4) return null;
+    const q = gpuQ.free.pop() || gl.createQuery();
+    gl.beginQuery(gpuQ.ext.TIME_ELAPSED_EXT, q);
+    return q;
+  }
+  function gpuEnd(gl, q) { if (q) { gl.endQuery(gpuQ.ext.TIME_ELAPSED_EXT); gpuQ.pending.push(q); } }
+  function gpuCollect(gl) {
+    if (!gpuQ.ext) return;
+    const lost = gl.getParameter(gpuQ.ext.GPU_DISJOINT_EXT);
+    while (gpuQ.pending.length && gl.getQueryParameter(gpuQ.pending[0], gl.QUERY_RESULT_AVAILABLE)) {
+      const q = gpuQ.pending.shift();
+      if (!lost) { perfAcc.gpu += gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6; perfAcc.gpuN++; }
+      gpuQ.free.push(q);
+    }
+  }
+  function perfFrame(frameMs, cpuMs, dt) {
+    E.frameCpu = cpuMs;
+    perfAcc.frame += frameMs; perfAcc.cpu += cpuMs; perfAcc.n++; perfAcc.t += dt;
+    if (perfAcc.t < 0.5) return;
+    const n = perfAcc.n;
+    Object.assign(E.perf, { frame: perfAcc.frame / n, cpu: perfAcc.cpu / n, probe: perfAcc.probe / n, probeN: perfAcc.probeN / n,
+      gpu: perfAcc.gpuN ? perfAcc.gpu / perfAcc.gpuN : 0, n: n });
+    for (const k in perfAcc) perfAcc[k] = 0;
+    autoRes(E.perf);
+    if (E.onPerf) E.onPerf(E.perf);
+  }
+
+  // ---------------- automatic resolution: a steady frame rate ----------------
+  // E.autoRes: twice a second the render scale follows the GPU time of the world's draw (the timer query; without it
+  // the frame time), aiming at 80% of the frame budget of E.fpsTarget: down at once when too slow, up gently.
+  // Every map remembers its own scale. E.fpsCap: frames are not drawn faster than E.fpsTarget (less heat on laptops).
+  // Kept by js/video.js (menu → Obraz).
+  Object.assign(E, { autoRes: true, fpsTarget: 60, fpsCap: true, resMin: 0.35, resMax: 1, resByWorld: {} });
+  // after a map change or a new render size the next frames are slow for reasons of their own (warm-up, a new
+  // drawing buffer): the controller waits that out
+  let upT = 0;
+  E.autoHold = 0;
+  function autoRes(p) {
+    if (!E.autoRes || !E.world || E._switching || !p.n || E.time < E.autoHold) return;
+    const budget = 1000 / (E.fpsTarget || 60);
+    let next = E.resScale;
+    if (p.gpu > 0) {
+      // the timer sees only the world's draw — the browser composes the page on the GPU too, and a frame that misses
+      // a display refresh waits for the next one — so: the draw within 70% of the budget AND frames on time.
+      // Nothing changes between the two thresholds (no see-saw between two sizes).
+      const lg = p.gpu / (budget * 0.7), lf = p.frame / budget;
+      if (lg > 1.12 || lf > 1.1) next = Math.max(E.resScale / Math.sqrt(Math.max(lg, lf, 1.15)), E.resScale * 0.8);   // too slow: down at once
+      else if (lg < 0.8 && lf < 1.03) next = E.resScale + Math.min(0.03, E.resScale * (1 / Math.sqrt(Math.max(lg, 0.25)) - 1) * 0.5);
+    } else {
+      // no GPU timer: only the frame time is known — down when late, now and then a small step up to try
+      upT += 0.5;
+      if (p.frame > budget * 1.1) { next = E.resScale * 0.9; upT = -4; }
+      else if (p.frame < budget * 1.03 && upT >= 2) { next = E.resScale + 0.02; upT = 0; }
+    }
+    next = WM.clamp(next, E.resMin, E.resMax);
+    if (Math.abs(next - E.resScale) >= 0.01) { E.resScale = Math.round(next * 100) / 100; E.autoHold = E.time + 0.6; }
+    E.resByWorld[E.worldIndex] = E.resScale;
+  }
 
   // ---------------- worlds ----------------
   E.switchWorld = function (i, opts = {}) {
@@ -182,6 +331,9 @@
       fade.textContent = '';
       if (!finishWorld(w)) { E._switching = false; fade.style.opacity = 0; return; }
       E.world = w; E.worldIndex = i;
+      E.probeReset();
+      if (E.autoRes && E.resByWorld[i]) E.resScale = E.resByWorld[i];     // where this map ended last time
+      E.autoHold = E.time + 1.5;
       w.enter(opts);
       if (w.bullets) w.bullets.clear();
       WGun.refill();
@@ -208,8 +360,9 @@
       if (!E.locked) { E.keys = {}; E.fireHeld = false; }
       if (E.onLockChange) E.onLockChange(E.locked);
     });
-    document.addEventListener('mousedown', e => { if (E.locked && e.button === 0) E.fireHeld = true; });
-    document.addEventListener('mouseup', e => { if (e.button === 0) E.fireHeld = false; });
+    // mouse buttons and the wheel go through the controls (js/input.js): LPM = Fire by default
+    document.addEventListener('mousedown', e => { if (E.locked) WInput.press('Mouse' + e.button); });
+    document.addEventListener('mouseup', e => { WInput.release('Mouse' + e.button); });
     document.addEventListener('mousemove', e => { if (E.locked) { E.mouseDX += e.movementX; E.mouseDY += e.movementY; } });
     // mouse wheel: fly up / down (the player hovers until it lands again); Ctrl + wheel: field of view
     c.addEventListener('wheel', e => {
@@ -217,7 +370,7 @@
       if (e.ctrlKey) {
         E.fov = WM.clamp(E.fov * (e.deltaY > 0 ? 1.08 : 1 / 1.08), 0.3, 2.9);
         E.toast('FOV ' + Math.round(E.fov * 180 / Math.PI) + '°', 700);
-      } else if (E.locked && e.deltaY) E.flyImpulse += e.deltaY < 0 ? 1 : -1;
+      } else if (E.locked && e.deltaY) WInput.impulse(e.deltaY < 0 ? 'WheelUp' : 'WheelDown');
     }, { passive: false });
     window.addEventListener('keydown', e => {
       if (e.code === 'Tab' || e.code === 'Space') e.preventDefault();
@@ -231,34 +384,75 @@
       if (e.code === 'KeyM' || e.code === 'Tab' || e.code === 'KeyH') E.unlock();
       if (e.code === 'KeyR' && E.world && E.world.bullets) WGun.reload();
       if (e.code === 'KeyP') { E.projMode = (E.projMode + 1) % E.PROJ_NAMES.length; E.toast('Projekcja: ' + E.PROJ_NAMES[E.projMode]); }
-      if (e.code === 'BracketLeft') { E.resScale = Math.max(0.25, E.resScale - 0.1); E.toast('Rozdzielczość ' + Math.round(E.resScale * 100) + '%', 700); }
-      if (e.code === 'BracketRight') { E.resScale = Math.min(1.5, E.resScale + 0.1); E.toast('Rozdzielczość ' + Math.round(E.resScale * 100) + '%', 700); }
+      if (e.code === 'BracketLeft' || e.code === 'BracketRight') {   // by hand: the automatic resolution turns off
+        E.resScale = WM.clamp(Math.round((E.resScale + (e.code === 'BracketLeft' ? -0.1 : 0.1)) * 10) / 10, 0.25, 1.5);
+        const was = E.autoRes;
+        E.autoRes = false;
+        if (E.onVideoChange) E.onVideoChange();
+        E.toast('Rozdzielczość ' + Math.round(E.resScale * 100) + '%' + (was ? ' — automatyczna wyłączona (menu → Obraz)' : ''), was ? 2500 : 700);
+      }
     });
     window.addEventListener('keyup', e => { E.keys[e.code] = false; });
     window.addEventListener('blur', () => { E.keys = {}; E.fireHeld = false; });
   };
 
-  E.axis = (neg, pos) => (E.keys[pos] ? 1 : 0) - (E.keys[neg] ? 1 : 0);
+  // keys, plus the analog value of a SpaceMouse axis bound to that pair (analog = false: keys only)
+  E.analog = {};
+  const ANALOG_OF = { KeyD: 'moveX', KeyW: 'moveY', Space: 'moveZ', KeyT: 'ana', KeyE: 'rotFW', KeyC: 'rotRW' };
+  E.axis = (neg, pos, analog = true) => {
+    const k = (E.keys[pos] ? 1 : 0) - (E.keys[neg] ? 1 : 0), a = analog && ANALOG_OF[pos] ? E.analog[ANALOG_OF[pos]] || 0 : 0;
+    return a ? WM.clamp(k + a, -1, 1) : k;
+  };
+
+  // the offscreen target of a reduced render scale (as big as the canvas; reallocated only when the canvas is)
+  const scene = { fb: null, tex: null, w: 0, h: 0 };
+  function sceneTarget(gl, W, H) {
+    if (!scene.fb) { scene.fb = gl.createFramebuffer(); scene.tex = gl.createTexture(); }
+    if (scene.w !== W || scene.h !== H) {
+      gl.bindTexture(gl.TEXTURE_2D, scene.tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, scene.fb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, scene.tex, 0);
+      scene.w = W; scene.h = H;
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, scene.fb);
+  }
 
   // ---------------- loop ----------------
   let last0 = performance.now(), last = performance.now(), fpsAcc = 0, fpsN = 0, fps = 0, autoT = 0;
+  let lastShown = 0, lastRaf = 0;
+  E.refreshMs = 16.7;                      // the display's refresh interval (running median-ish estimate)
   E.frame = function (now) {
+    const raw = now - lastRaf; lastRaf = now;
+    if (raw > 2 && raw < 60) E.refreshMs += (Math.min(raw, E.refreshMs * 1.5) - E.refreshMs) * 0.05;
+    // the frame limit: skip this refresh if the next frame is not due yet — only on displays clearly faster than the
+    // target (144 Hz for 60 FPS), with half a refresh of slack (the callback times jitter)
+    const due = E.fpsTarget ? 1000 / E.fpsTarget : 0;
+    if (E.fpsCap && due && E.refreshMs < due * 0.75 && now - lastShown < due - E.refreshMs * 0.5) { E.counts.skipped++; requestAnimationFrame(E.frame); return; }
+    lastShown = now;
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     E.time += dt;
     fpsAcc += dt; fpsN++;
     if (fpsAcc > 0.5) { fps = E.fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
+    const last0prev = last0;
     E.maxFrameMs = Math.max(E.maxFrameMs || 0, now - last0); last0 = now;
 
-    const gl = E.gl, w = E.world;
+    const gl = E.gl, w = E.world, t0 = performance.now();
+    WInput.poll(dt);
+    gpuCollect(gl);
+    if (E.asyncProbes) probeCollect();
     if (w && w.prog) {
       const look = { dx: E.mouseDX * 0.0022, dy: E.mouseDY * 0.0022 };
       E.mouseDX = E.mouseDY = 0;
+      WInput.look(look, dt);
       WMP.update(dt);
       w.update(dt, look);
       if (E.onFrame) E.onFrame(dt);
       WGun.update(dt);
       if (w.bullets) {
-        if (E.fireHeld && !WMP.dead() && (!w.canFire || w.canFire()) && WGun.tryFire()) {
+        if ((E.fireHeld || E.keys.Fire) && !WMP.dead() && (!w.canFire || w.canFire()) && WGun.tryFire()) {
           const aim = w.aim();
           w.bullets.fire(aim);
           WMP.shot(w, aim);
@@ -268,9 +462,20 @@
         w.bullets.update(dt);
       }
 
-      const cw = Math.max(1, Math.floor(window.innerWidth * E.resScale));
-      const ch = Math.max(1, Math.floor(window.innerHeight * E.resScale));
-      if (E.canvas.width !== cw || E.canvas.height !== ch) { E.canvas.width = cw; E.canvas.height = ch; }
+      probeSubmit();
+      // Render size = the screen's real pixels × resScale (100% = native, e.g. all of a 4K monitor even with Windows
+      // display scaling). The canvas keeps ONE size — the window × the highest scale the automatic resolution may use —
+      // because resizing it reallocates the browser's drawing buffer (hundreds of ms at 4K: a hitch every time the
+      // scale changed). Below that the world is drawn into a corner of an offscreen target and scaled onto the canvas
+      // (blitFramebuffer), so a new render scale costs nothing.
+      const dpr = window.devicePixelRatio || 1, top = E.autoRes ? Math.max(E.resMax, E.resScale) : E.resScale;
+      const W = Math.max(1, Math.floor(window.innerWidth * dpr * top)), H = Math.max(1, Math.floor(window.innerHeight * dpr * top));
+      if (E.canvas.width !== W || E.canvas.height !== H) { E.canvas.width = W; E.canvas.height = H; E.counts.resize++; }
+      const cw = Math.max(1, Math.min(W, Math.floor(window.innerWidth * dpr * E.resScale)));
+      const ch = Math.max(1, Math.min(H, Math.floor(window.innerHeight * dpr * E.resScale)));
+      E.renderW = cw; E.renderH = ch;
+      const scaled = cw !== W || ch !== H;
+      if (scaled) sceneTarget(gl, W, H);
       gl.viewport(0, 0, cw, ch);
       gl.useProgram(w.prog);
       gl.uniform2f(w.prog.u('uRes'), cw, ch);
@@ -283,8 +488,17 @@
       if (w.setBulletUniforms) w.setBulletUniforms(gl, w.prog);
       else if (w.bullets) w.bullets.setUniforms(gl, w.prog); else gl.uniform1i(w.prog.u('uBulletN'), 0);
       gl.bindVertexArray(E.vao);
+      const q = gpuBegin(gl);
       if (w.drawViews && w.drawViews(gl, w.prog, cw, ch)) gl.viewport(0, 0, cw, ch);   // split screen (4D)
       else gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gpuEnd(gl, q);
+      if (scaled) {                              // the drawn corner → the whole canvas
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, scene.fb);
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+        gl.blitFramebuffer(0, 0, cw, ch, 0, 0, W, H, gl.COLOR_BUFFER_BIT, gl.LINEAR);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      }
+      perfFrame(now - last0prev, performance.now() - t0, dt);
       if (E.afterDraw) E.afterDraw();
 
       // optional 2D overlays of the world: a corner panel (e.g. the 4D compass; drawOverlay may return false to hide it),
@@ -313,7 +527,8 @@
         autoT = 0;
         const s = w.stats ? w.stats() : '';
         document.getElementById('hudStats').textContent =
-          `${fps.toFixed(0)} FPS · ${cw}×${ch} · ${E.PROJ_NAMES[E.projMode]}` + (s ? '\n' + s : '');
+          `${fps.toFixed(0)} FPS · ${cw}×${ch} (${Math.round(E.resScale * 100)}%${E.autoRes ? ' auto' : ''}) · ${E.PROJ_NAMES[E.projMode]}` +
+          (E.perf.gpu ? ` · GPU ${E.perf.gpu.toFixed(1)} ms` : '') + ` · CPU ${E.perf.cpu.toFixed(1)} ms (sondy ${E.perf.probe.toFixed(1)})` + (s ? '\n' + s : '');
       }
     }
     requestAnimationFrame(E.frame);

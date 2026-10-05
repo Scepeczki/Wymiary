@@ -132,28 +132,28 @@
           b.age += dt;
           return pts;
         });
-        const d = WE.probe(path.flat().map(x => x.p));
-        live.forEach((b, i) => {
+        // the walls along this path are known a frame later (WE.probeLater): a bullet that hit one goes back to
+        // the point of impact (by then it flew one frame further — behind the wall, so not seen)
+        WE.probeLater(path.flat().map(x => x.p), d => live.forEach((b, i) => {
+          if (b.dead >= 0) return;                     // finished meanwhile
           for (let k = 0; k < SUBSTEPS; k++) {
             // targets (monsters, the player) first: they are part of the distance field too
-            if (this.opts.hitTest && this.opts.hitTest(path[i][k].p)) {
-              b.s = path[i][k].s; b.dead = 0;
-              if (window.WAudio) WAudio.impact(WE.world, m.pos(b.s));
-              return;
-            }
-            if (d[i * SUBSTEPS + k] < m.radius) {
+            if ((this.opts.hitTest && this.opts.hitTest(path[i][k].p)) || d[i * SUBSTEPS + k] < m.radius) {
               b.s = path[i][k].s; b.dead = 0;
               if (window.WAudio) WAudio.impact(WE.world, m.pos(b.s));
               return;
             }
           }
+        }));
+        for (const b of live) {
+          if (b.dead >= 0) continue;
           if (b.age > m.life) b.dead = 0;
           // a bullet that came all the way around the world and hits its shooter
-          if (this.opts.selfDist && b.age > 0.4 && this.opts.selfDist(m.pos(b.s)) < 0) {
+          else if (this.opts.selfDist && b.age > 0.4 && this.opts.selfDist(m.pos(b.s)) < 0) {
             b.dead = 0;
             WE.hurt('Trafiłeś sam siebie!');
           }
-        });
+        }
       }
       for (const b of this.list) {
         if (b.dead >= 0) { if (b.deathT > 1e8) b.deathT = WE.time; b.dead += dt; }

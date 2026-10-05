@@ -35,6 +35,7 @@
     world.viewLabel = () => (!world.split && world.view ? `<b>${D.VIEWS[world.view][0]}</b> ${D.VIEWS[world.view][1]}` : '');
     world.is4D = true;
     world.crossPos = () => D.crossPos(world);
+    world.lcdInfo = () => `w ${D.shown(world.player.pos).w.toFixed(2)} · kamera ${world.split ? '4 widoki' : '(' + D.VIEWS[world.view][0] + ')'}`;   // SpaceMouse screen
     const own = world.drawLayer;               // the gizmos first, then the world's own layer (e.g. labels)
     world.drawLayer = function (ctx, W, H, dt) { D.drawLayer(world, ctx, W, H); if (own) own.call(world, ctx, W, H, dt); };
     if (world.drawOverlay) {
@@ -114,7 +115,7 @@
       rot: [[1, 2, 'KeyQ', 'KeyE'], [0, 2, 'KeyZ', 'KeyC']],
       moves: [[2, 'KeyG', 'KeyT']],
     });
-    if (WE.keys.KeyQ || WE.keys.KeyE || WE.keys.KeyZ || WE.keys.KeyC) world.snap = null;
+    if (WE.keys.KeyQ || WE.keys.KeyE || WE.keys.KeyZ || WE.keys.KeyC || WE.analog.rotFW || WE.analog.rotRW) world.snap = null;
   };
 
   // ---- the layout of the four views (F) — edited in the menu (button on 4D maps), kept in this browser ----

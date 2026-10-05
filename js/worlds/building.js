@@ -400,7 +400,7 @@ vec3 light(vec3 p, vec3 n, vec3 rd, vec3 alb, float ao){
       WE.toast('Zginąłeś! Potwory wracają.', 3000); this.enter({}); this.bullets.clear();
     },
     update(dt, look) {
-      S.g = WM.clamp(S.g + WE.axis('KeyQ', 'KeyE') * dt * 0.4, -1, 1);
+      S.g = WM.clamp(S.g + WE.axis('KeyQ', 'KeyE', false) * dt * 0.4, -1, 1);
       if (WE.keys.KeyX) S.g = 0;
       this.player.update(dt, look);
       horde.update(dt);

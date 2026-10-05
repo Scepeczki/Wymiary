@@ -1,4 +1,5 @@
-// Network transport for multiplayer (talks to server/server.js over a WebSocket on the same host).
+// Network transport for multiplayer (talks to server/server.js over a WebSocket: your own server when you host,
+// another player's server when you join, or the server the page came from).
 // The server relays every message to all other players, adding `from`. What the messages mean is decided by
 // js/mp.js; this file keeps the connection and, per peer, a short buffer of its states for interpolation:
 //   s: state { room, g: geometry (numbers), alive, hp }   (20× per second)
@@ -7,10 +8,11 @@
   const N = { ws: null, id: null, team: 'A', peers: new Map(), handlers: {}, delay: 0.1 };
 
   N.connected = () => !!(N.ws && N.ws.readyState === 1 && N.id != null);
-  N.connect = function (handlers) {
+  // url: ws://<server>/ws (default: the server this page came from)
+  N.connect = function (handlers, url) {
     N.close();
     N.handlers = handlers || {};
-    const ws = N.ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+    const ws = N.ws = new WebSocket(url || (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
     ws.onmessage = e => {
       let m; try { m = JSON.parse(e.data); } catch (err) { return; }
       if (m.t === 'welcome') { N.id = m.id; N.team = m.team; for (const p of m.peers || []) peer(p.id).team = p.team; }

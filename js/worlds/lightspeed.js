@@ -255,7 +255,7 @@ vec3 light(vec3 p, vec3 n, vec3 rd, vec3 alb, float ao){
       return l > 0.985 ? WM.scale(b, 0.985 / l) : b;
     },
     update(dt, look) {
-      S.s = WM.clamp(S.s + WE.axis('KeyQ', 'KeyE') * dt * 0.25, 0, 1);
+      S.s = WM.clamp(S.s + WE.axis('KeyQ', 'KeyE', false) * dt * 0.25, 0, 1);
       this.player.update(dt, look);
       horde.update(dt);
       // record positions (player: continuous yaw so interpolation never spins around)

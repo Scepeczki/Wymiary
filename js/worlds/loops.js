@@ -818,7 +818,7 @@ vec3 material(float id, vec3 p, vec3 n, inout float emit){
       this.diff = DIFF[this.mode] || DIFF[1];
       // teams (spawn bases) only in the network game; otherwise everybody starts in base A
       this.team = this.mode === 3 && WMP.online() ? WNet.team : 'A';
-      if (this.mode === 3 && !WMP.online()) WE.toast('Gra sieciowa: uruchom skrót „Wymiary – gra sieciowa (serwer)”, a drugi gracz „Wymiary – dołącz do gry”. Na każdej mapie można grać razem.', 7000);
+      if (this.mode === 3 && !WMP.online()) WE.toast('Gra sieciowa: menu (Esc) → 🌐 Gra sieciowa — jeden gracz hostuje, drugi dołącza. Na każdej mapie można grać razem.', 7000);
       this.rivalShots.clear(); this.mePh = 0;
       this.rival.hp = 0; this.rival.dead = 99;
       this.respawnMe();

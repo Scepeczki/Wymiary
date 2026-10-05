@@ -58,6 +58,7 @@ const check = (ok, msg) => { if (!ok) fail++; console.log(`  ${ok ? 'OK ' : 'ŹL
 
 console.log(`połączeni: A = gracz ${A.WNet.id}, B = gracz ${B.WNet.id}`);
 A.WE.worlds.forEach((wA, wi) => {
+  if (!wA.mp) { console.log(`${wA.name}: mapa bez gry sieciowej — pominięta`); return; }
   const modes = wA.modes ? wA.modes.map((m, k) => k) : [0];
   for (const mode of modes) {
     enter(A, wi, mode); enter(B, wi, mode);

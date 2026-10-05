@@ -1,5 +1,5 @@
-// Multiplayer on every map and in every mode. When the game is opened from a game server (host.cmd / server.js),
-// every player is connected all the time. Players see each other when they are in the same ROOM = the same map in
+// Multiplayer on every map and in every mode. In the menu (🌐 Gra sieciowa) one player hosts — the game's own server
+// opens a port — and the others join with that address; then every player is connected all the time. Players see each other when they are in the same ROOM = the same map in
 // the same mode; the menu shows where the others are and lets you join them.
 //  * Every client simulates its own player and sends its state 20× per second (WNet 's'): the room, its geometry
 //    (the map's space adapter encodes it as numbers: feet + yaw in 3D, a whole frame in 4D and in curved space).
@@ -13,7 +13,7 @@
 // are re-centred, like H³), world.playerPoints() and world.ai() (-> object with netExport / netImport / netDamage / shots).
 (function () {
   const MP = { kills: {}, deadT: 0, room: null };
-  let sendT = 0, aiT = 0, retryT = 0, started = false;
+  let sendT = 0, aiT = 0, retryT = 0, started = false, target = null;   // target: ws:// URL of the server you play on
 
   const online = () => WNet.connected();
   const roomOf = w => (w && WE.worldIndex >= 0 ? `${WE.worlds.indexOf(w)}:${w._modeIdx || 0}` : null);
@@ -117,7 +117,8 @@
     if (!online()) return [];
     return [...WNet.peers.values()].filter(p => p.room).map(p => { const [map, mode] = p.room.split(':').map(Number); return { id: p.id, map, mode, alive: p.alive }; });
   };
-  MP.status = () => (online() ? `sieć: jesteś graczem ${WNet.id} · połączonych: ${WNet.peers.size + 1}` : started ? 'sieć: łączenie z serwerem…' : '');
+  MP.status = () => (online() ? `sieć: ${MP.hosting ? 'hostujesz' : MP.joined ? 'gra u ' + MP.joined : 'połączono'} · jesteś graczem ${WNet.id} · połączonych: ${WNet.peers.size + 1}`
+    : started ? 'sieć: łączenie z serwerem…' : '');
 
   // ---- per frame ----
   MP.update = function (dt) {
@@ -198,13 +199,54 @@
       if (ai && MP.isLeader(w)) ai.netDamage(m.slot, m.dmg, m.from);
     },
     error: () => {},
-    close: () => { WE.toast('Rozłączono z serwerem gry — łączę ponownie…', 3000); },
+    close: () => { if (target) WE.toast('Rozłączono z serwerem gry — łączę ponownie…', 3000); },
   };
-  function connect() { WNet.connect(handlers); }
-  // connect when the game was opened from a game server
-  MP.start = function () {
+  function connect() { WNet.connect(handlers, target); }
+  function setTarget(t) { target = t; started = !!t; WNet.close(); retryT = 0; if (t) connect(); }
+  const wsUrl = addr => 'ws://' + addr + '/ws';
+
+  // ---- the game's own server (app mode: the Wymiary shortcut starts it, the page comes from 127.0.0.1) ----
+  // MP.app = { version, hash, release, host } or null; MP.hosting = { port, addrs } while you host; MP.joined = address
+  MP.app = null; MP.hosting = null; MP.joined = null;
+  MP.api = (p, post) => fetch(p, { method: post ? 'POST' : 'GET', headers: { 'X-Wymiary': '1' } }).then(r => r.json());
+  // the window's lifeline: the server quits a few seconds after it is gone (window closed)
+  function lifeline() {
+    const ws = new WebSocket('ws://' + location.host + '/ctl');
+    ws.onclose = () => setTimeout(lifeline, 2000);
+  }
+  MP.start = async function () {
     if (!/^https?:/.test(location.protocol) || typeof WebSocket === 'undefined') return;
-    started = true; connect();
+    try { const a = await MP.api('/api/app'); if (a && a.app) MP.app = a; } catch (e) { /* not the game's own server */ }
+    if (MP.app) {
+      lifeline();
+      if (MP.app.host) { MP.hosting = MP.app.host; setTarget(wsUrl(location.host)); }   // the page was reloaded while hosting
+    } else setTarget(wsUrl(location.host));     // opened from another player's server in a browser: play there
   };
+  // host from the game: the server opens a port for the others; you play on your own server
+  MP.host = async function () {
+    const r = await MP.api('/api/host', true);
+    if (r.ok) { MP.hosting = r.host; MP.joined = null; setTarget(wsUrl(location.host)); }
+    return r;
+  };
+  // join another player: check that both run the same game (force: connect anyway), then connect
+  MP.join = async function (addr, force) {
+    addr = addr.trim();
+    let r;
+    if (MP.app) r = await MP.api('/api/remote?addr=' + encodeURIComponent(addr));
+    else {                                       // opened from disk (no own server): just try
+      const a = addr.replace(/^\w+:\/\//, '').replace(/\/.*$/, '') + (/:\d+$/.test(addr) ? '' : ':8080');
+      try { const m = await (await fetch('http://' + a + '/api/manifest')).json(); r = { ok: true, addr: a, same: true, version: m.version }; }
+      catch (e) { r = { ok: false, addr: a, error: `Brak połączenia z ${a}.` }; }
+    }
+    if (!r.ok || (!r.same && !force)) return r;
+    if (MP.hosting) await MP.stopHost();
+    MP.joined = r.addr;
+    try { localStorage.setItem('wymiary.lastHost', addr); } catch (e) { /* no storage */ }
+    setTarget(wsUrl(r.addr));
+    return r;
+  };
+  MP.stopHost = async function () { MP.hosting = null; setTarget(null); try { await MP.api('/api/host/stop', true); } catch (e) { /* server gone */ } };
+  MP.leave = async function () { MP.joined = null; if (MP.hosting) await MP.stopHost(); else setTarget(null); WE.toast('Rozłączono — grasz sam', 2000); };
+  MP.lastHost = () => { try { return localStorage.getItem('wymiary.lastHost') || ''; } catch (e) { return ''; } };
   window.WMP = MP;
 })();

@@ -187,6 +187,7 @@
     buildList();
     $('playBtn').addEventListener('click', () => play());
     $('restartBtn').addEventListener('click', () => play(true));
+    $('ctlBtn').addEventListener('click', () => WInput.open());
     WE.onLockChange = locked => M.show(!locked);
     WE.onWorldChanged = (w, opts) => {
       // remember which mode the running map is in (also when switched in game with the number keys)
@@ -200,7 +201,7 @@
     };
     // keyboard in the menu: arrows choose a map, digits jump to one, Enter plays
     window.addEventListener('keydown', e => {
-      if (!M.open || e.target.tagName === 'INPUT') return;
+      if (!M.open || e.target.tagName === 'INPUT' || WInput.uiOpen || WNetUi.open || WVideo.open) return;
       const cols = Math.max(1, Math.round($('mapList').clientWidth / 264));
       const k = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: cols, ArrowUp: -cols }[e.code];
       if (k) { e.preventDefault(); select(WM.clamp(M.sel + k, 0, WE.worlds.length - 1)); }

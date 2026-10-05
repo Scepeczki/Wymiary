@@ -70,7 +70,9 @@
   #menu { font-family: system-ui, 'Segoe UI', sans-serif; position: fixed; inset: 0; box-sizing: border-box; padding: 22px 30px 14px; display: grid; grid-template-rows: auto auto 1fr auto; gap: 14px;
           background: radial-gradient(ellipse at 70% 40%, rgba(16,10,40,.72), rgba(6,4,16,.93) 70%); opacity: 0; pointer-events: none; transition: opacity .2s; }
   #menu.open { opacity: 1; pointer-events: auto; }
-  .mtop { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; }
+  .mtop { display: flex; align-items: baseline; gap: 18px; flex-wrap: nowrap; min-width: 0; }
+  .mtop > * { flex: none; }
+  .mtop .tagline, .mtop #prep, .mtop #net { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #menu h1 { font-size: 46px; margin: 0; letter-spacing: 12px; background: linear-gradient(90deg,#7df,#f7d,#fd7); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .tagline { font-size: 14px; opacity: .65; }
   #prep { font-size: 12px; opacity: .55; }
@@ -150,6 +152,96 @@
   #ammo .rl { width: 120px; height: 5px; margin-top: 3px; border-radius: 3px; background: rgba(0,0,0,.5); overflow: hidden; display: none; }
   #ammo.reloading .rl { display: block; }
   #ammo .rl div { height: 100%; width: 0; background: #fd7; }
+  /* benchmark results (js/worlds/benchmark.js, in the map's panel) */
+  .benchBox { padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,220,120,.35); background: rgba(255,220,120,.06); font-size: 12.5px; }
+  .benchBox h3 { margin: 6px 0 4px !important; }
+  .benchBox .bigfps { font-size: 28px; font-weight: bold; color: #fd7; }
+  .benchBox .bmeta { margin: 2px 0 8px; opacity: .8; line-height: 1.45; }
+  .benchBox table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .benchBox td { padding: 2px 4px; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .benchBox .bhist td { font-size: 11.5px; opacity: .85; }
+  .benchBox .bbtns { display: flex; gap: 6px; margin-top: 8px; }
+  .benchBox .bbtns button { flex: 1; }
+  /* picture window (js/video.js) */
+  #vid { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.55); font-family: system-ui, 'Segoe UI', sans-serif; }
+  #vid .ed { width: 620px; max-width: calc(100vw - 32px); max-height: calc(100vh - 40px); overflow-y: auto; padding: 18px 22px; border-radius: 14px; background: #120e26; border: 1px solid rgba(160,190,255,.35); box-shadow: 0 10px 40px rgba(0,0,0,.6); box-sizing: border-box; }
+  #vid h3 { margin: 0 0 6px; }
+  #vid section { margin-top: 10px; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.03); }
+  #vid .vlive { font-size: 13px; color: #8cf; margin: 4px 0; font-variant-numeric: tabular-nums; }
+  #vid .one { display: block; margin: 8px 0; font-size: 13px; }
+  #vid .vrow { display: grid; grid-template-columns: 190px 1fr 56px; gap: 10px; align-items: center; font-size: 13px; margin: 8px 0; }
+  #vid .vrow input { accent-color: #7df; min-width: 0; }
+  #vid select { font: inherit; font-size: 13px; padding: 3px 6px; border-radius: 6px; background: #1d1838; color: #e8f0ff; border: 1px solid rgba(255,255,255,.25); justify-self: start; }
+  #vid .hint { font-size: 12px; opacity: .65; margin: 6px 0 0; }
+  #vid .btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+  #vid button { padding: 7px 14px; border-radius: 8px; border: 0; font: inherit; color: inherit; cursor: pointer; background: rgba(255,255,255,.12); }
+  #vid button.go { background: linear-gradient(90deg,#7df,#f7d); color: #120a20; font-weight: bold; }
+  /* network game window (js/netui.js) */
+  #netw { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.55); font-family: system-ui, 'Segoe UI', sans-serif; }
+  #netw .ed { width: 620px; max-width: calc(100vw - 32px); max-height: calc(100vh - 40px); overflow-y: auto; padding: 18px 22px; border-radius: 14px; background: #120e26; border: 1px solid rgba(160,190,255,.35); box-shadow: 0 10px 40px rgba(0,0,0,.6); box-sizing: border-box; }
+  #netw h3 { margin: 0 0 6px; }
+  #netw h4 { margin: 0 0 8px; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; opacity: .55; font-weight: normal; }
+  #netw section { margin-top: 10px; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.03); }
+  #netState { font-size: 14px; margin: 4px 0; color: #8cf; }
+  #netw .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  #netw .hint { font-size: 12px; opacity: .65; margin: 8px 0 0; }
+  #netw button { padding: 7px 14px; border-radius: 8px; border: 0; font: inherit; color: inherit; cursor: pointer; background: rgba(255,255,255,.12); }
+  #netw button.go { background: linear-gradient(90deg,#7df,#f7d); color: #120a20; font-weight: bold; }
+  #netw button:disabled { opacity: .4; cursor: default; }
+  #netAddr { flex: 1; min-width: 0; padding: 7px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.25); background: #1d1838; color: #e8f0ff; font: inherit; }
+  #netAddrs p { font-size: 13px; margin: 10px 0 6px; }
+  #netAddrs .addr { display: flex; gap: 10px; align-items: center; font-size: 13px; padding: 4px 0; }
+  #netAddrs code { font-size: 16px; color: #fd7; min-width: 190px; }
+  #netAddrs .addr span { flex: 1; opacity: .7; }
+  #netAddrs .addr button { padding: 3px 10px; font-size: 12px; }
+  #netMsg { font-size: 13px; min-height: 1em; margin: 10px 0 0; } #netMsg.bad { color: #f99; }
+  #netw .btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+  /* controls: keys, mouse, SpaceMouse (js/input.js) */
+  .topBtn { padding: 5px 12px; border-radius: 7px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.07); color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
+  .topBtn:hover { border-color: rgba(140,200,255,.6); }
+  #smStat { font-size: 12px; color: #9f9; }
+  #ctl { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.55); font-family: system-ui, 'Segoe UI', sans-serif; }
+  #ctl .ed { width: 900px; max-width: calc(100vw - 32px); max-height: calc(100vh - 40px); overflow-y: auto; padding: 18px 22px; border-radius: 14px; background: #120e26; border: 1px solid rgba(160,190,255,.35); box-shadow: 0 10px 40px rgba(0,0,0,.6); box-sizing: border-box; }
+  #ctl h3 { margin: 0 0 6px; }
+  #ctl section { margin-top: 10px; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.03); }
+  #ctl .sh, #ctl h4 { margin: 10px 0 6px; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; opacity: .55; font-weight: normal; }
+  #ctl section > .sh:first-child { margin-top: 0; }
+  #ctl .hint { font-size: 12px; opacity: .7; margin: 8px 0; }
+  #ctl .one { display: block; margin: 6px 0; font-size: 13px; }
+  #ctl button { font: inherit; color: inherit; cursor: pointer; }
+  #ctl select { font: inherit; font-size: 12px; padding: 3px; border-radius: 6px; background: #1d1838; color: #e8f0ff; border: 1px solid rgba(255,255,255,.25); min-width: 0; }
+  #ctl input[type=range] { accent-color: #7df; min-width: 0; }
+  .srowc { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+  #ctlStat { flex: 1; opacity: .85; } #ctlStat.ok { color: #9f9; opacity: 1; }
+  #ctlConnect { padding: 7px 14px; border-radius: 8px; border: 0; background: linear-gradient(90deg,#7df,#f7d); color: #120a20 !important; font-weight: bold; }
+  #ctl .gl { display: grid; grid-template-columns: 170px 1fr 60px; gap: 4px 10px; align-items: center; font-size: 13px; max-width: 560px; }
+  .arow { display: grid; grid-template-columns: 200px 110px minmax(0, 1fr) 80px 120px 46px; gap: 8px; align-items: center; font-size: 12.5px; margin: 4px 0; }
+  .abar { position: relative; height: 8px; border-radius: 4px; background: rgba(255,255,255,.1); overflow: hidden; }
+  .abar::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,.4); }
+  .abar i { position: absolute; top: 0; bottom: 0; background: #7df; }
+  .av { font-variant-numeric: tabular-nums; opacity: .8; }
+  .pvbox { margin: 10px 0 4px; }
+  #ctlCompass { width: 100%; max-width: 800px; aspect-ratio: 800 / 240; border-radius: 8px; border: 1px solid rgba(255,255,255,.15); display: block; }
+  .pvcap { display: flex; gap: 10px; align-items: center; font-size: 12px; opacity: .75; margin-top: 4px; }
+  .pvcap span { flex: 1; }
+  #ctl #ctlPvReset { padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.07); font-size: 12px; }
+  .arow .an b { display: inline-block; min-width: 26px; color: #fd7; }
+  .lcdrow { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  #ctlLcdView { width: 480px; max-width: 100%; image-rendering: pixelated; border-radius: 6px; border: 6px solid #2a3a2a; background: #000; }
+  .brow { display: grid; grid-template-columns: minmax(0, 1fr) 260px 170px; gap: 10px; align-items: center; font-size: 13px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+  .brow.bhead { font-size: 11px; opacity: .5; letter-spacing: 1px; text-transform: uppercase; }
+  .brow .bk, .brow .bs { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,.3); background: rgba(255,255,255,.08); font-size: 12px !important; }
+  .chip:hover { border-color: #f88; background: rgba(255,90,90,.2); text-decoration: line-through; }
+  .chip.dup { border-color: #fa6; color: #fc8 !important; }
+  .chip.add { border-style: dashed; opacity: .6; }
+  .chip.add:hover { text-decoration: none; background: rgba(120,220,255,.15); border-color: #7df; opacity: 1; }
+  .chip.add.wait { opacity: 1; border-color: #fd7; background: rgba(255,220,120,.2); }
+  .chip.add.wait::after { content: ' naciśnij…'; }
+  #ctl .btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+  #ctl .btns button { padding: 7px 14px; border-radius: 8px; border: 0; background: rgba(255,255,255,.12); }
+  #ctl #ctlClose { background: linear-gradient(90deg,#7df,#f7d); color: #120a20; font-weight: bold; }
+  @media (max-width: 800px) { .arow { grid-template-columns: 1fr 1fr; } .brow { grid-template-columns: 1fr; } }
   #err { position: fixed; inset: 0; background: #200; color: #fbb; padding: 20px; white-space: pre-wrap; font-size: 12px; overflow: auto; display: none; }
 </style>
 </head>
@@ -171,7 +263,7 @@
 <div id="viewlabel"></div>
 <div id="fade"></div>
 <div id="menu">
-  <div class="mtop"><h1>WYMIARY</h1><span class="tagline">strzelanka w przestrzeniach, które łamią intuicję</span><span id="prep"></span><span id="net"></span><span id="ver"></span></div>
+  <div class="mtop"><h1>WYMIARY</h1><span class="tagline">strzelanka w przestrzeniach, które łamią intuicję</span><span id="prep"></span><span id="net"></span><span id="smStat" style="display:none"></span><button id="netBtn" class="topBtn">🌐 Gra sieciowa</button><button id="vidBtn" class="topBtn">🖥 Obraz</button><button id="ctlBtn" class="topBtn">⌨ Sterowanie</button><span id="ver"></span></div>
   <div id="upd" hidden><b></b><small></small><button id="updBtn">⟳ Aktualizuj teraz</button></div>
   <div class="mbody">
     <div id="mapList"></div>
@@ -194,11 +286,84 @@
     1–9, 0 szybka zmiana mapy · Esc / M menu · P projekcja · [ ] rozdzielczość · kółko: lot (w 4D: krok w W) · Ctrl+kółko FOV · N noclip · V dźwięk · F11 pełny ekran
   </div>
 </div>
+<div id="vid"><div class="ed">
+  <h3>Obraz</h3>
+  <p id="vidLive" class="vlive"></p>
+  <section>
+    <label class="one"><input type="checkbox" id="vidAuto"> <b>Automatyczna rozdzielczość</b> — gra sama zmniejsza rozdzielczość renderu, gdy nie wyrabia, i podnosi, gdy ma zapas</label>
+    <div class="vrow"><label>Cel</label><select id="vidFps"><option value="30">30 FPS</option><option value="45">45 FPS</option><option value="60">60 FPS</option><option value="75">75 FPS</option><option value="90">90 FPS</option><option value="120">120 FPS</option><option value="144">144 FPS</option></select><span></span></div>
+    <label class="one"><input type="checkbox" id="vidCap"> Nie rysuj szybciej niż cel (równiejszy obraz, chłodniejszy laptop)</label>
+    <div id="vidAutoBox">
+      <div class="vrow"><label>Najniższa rozdzielczość</label><input type="range" id="vidMin" min="0.25" max="1" step="0.05"><span id="vidMinV"></span></div>
+      <div class="vrow"><label>Najwyższa rozdzielczość</label><input type="range" id="vidMax" min="0.25" max="1.5" step="0.05"><span id="vidMaxV"></span></div>
+      <p class="hint">Procent natywnej rozdzielczości ekranu (100% = wszystkie piksele, np. pełne 4K). Każda mapa pamięta, na czym skończyła. Ponad 100% = wygładzanie kosztem wydajności.</p>
+    </div>
+    <div id="vidManBox">
+      <div class="vrow"><label>Rozdzielczość renderu</label><input type="range" id="vidScale" min="0.25" max="1.5" step="0.05"><span id="vidScaleV"></span></div>
+      <p class="hint">Stała rozdzielczość (też klawisze [ ] w grze — wyłączają tryb automatyczny).</p>
+    </div>
+  </section>
+  <div class="btns"><button id="vidReset">Domyślne</button><button id="vidClose" class="go">Zamknij</button></div>
+</div></div>
+<div id="netw"><div class="ed">
+  <h3>Gra sieciowa</h3>
+  <p id="netState"></p>
+  <section id="netHostBox">
+    <h4>Hostuj grę na tym komputerze</h4>
+    <div class="row"><button id="netHost" class="go">Hostuj grę</button><button id="netStop">Zakończ hostowanie</button><span id="netHostNote" class="hint"></span></div>
+    <div id="netAddrs"></div>
+  </section>
+  <section id="netJoinBox">
+    <h4>Dołącz do gry</h4>
+    <div class="row"><input id="netAddr" placeholder="adres hosta, np. 192.168.1.55:8080" spellcheck="false"><button id="netJoin" class="go">Dołącz</button></div>
+    <p class="hint">Adres pokazuje się u hosta po kliknięciu „Hostuj grę”. Z innego domu: oba komputery w Tailscale → adres 100.x.x.x:8080.</p>
+  </section>
+  <p id="netMsg"></p>
+  <div class="btns"><button id="netForce">Połącz mimo to</button><button id="netLeave">Rozłącz</button><button id="netClose" class="go">Zamknij</button></div>
+</div></div>
+<div id="ctl"><div class="ed">
+  <h3>Sterowanie</h3>
+  <section>
+    <h4 class="sh">SpaceMouse</h4>
+    <div class="srowc"><span id="ctlStat"></span><button id="ctlConnect">🔌 Połącz SpaceMouse</button></div>
+    <label class="one"><input type="checkbox" id="ctlSm"> Używaj SpaceMouse w grze</label>
+    <div class="gl">
+      <label>Czułość ogólna</label><input type="range" id="ctlSens" min="0.2" max="3" step="0.05"><span id="ctlSensV"></span>
+      <label>Martwa strefa</label><input type="range" id="ctlDead" min="0" max="0.4" step="0.01"><span id="ctlDeadV"></span>
+      <label>Krzywa (1 = liniowa)</label><input type="range" id="ctlCurve" min="1" max="3" step="0.1"><span id="ctlCurveV"></span>
+    </div>
+    <p class="hint">Osie SpaceMouse: <b>T</b> = przesuw kapturka, <b>R</b> = obrót kapturka; X — w bok, Y — do / od siebie, Z — w górę / w dół.
+      Osie gracza (cele): <span class="ax-x">x</span> — w bok, <span class="ax-y">y</span> — do przodu, <span class="ax-z">z</span> — w górę,
+      <span class="ax-w">w</span> — czwarta oś (ana); obrót x–y to obrót w tej płaszczyźnie. Każda oś: cel, odwrócenie i własna czułość; pasek = wychylenie teraz.</p>
+    <div id="ctlAxes"></div>
+    <div class="pvbox"><canvas id="ctlCompass" width="800" height="240"></canvas>
+      <div class="pvcap"><span>Podgląd jak na mapie 4D: kompas pokazuje przestrzeń (x, y, w) wokół gracza testowego, którym steruje SpaceMouse (z i patrzenie — obok).</span>
+      <button id="ctlPvReset">⟲ Na start</button></div></div>
+    <p class="hint" id="ctlBtns"></p>
+    <div id="ctlLcdBox">
+      <h4 class="sh">Ekran SpaceMouse</h4>
+      <div class="lcdrow"><canvas id="ctlLcdView" width="480" height="128"></canvas>
+        <div><label class="one"><input type="checkbox" id="ctlLcd"> Pokazuj stan gry na ekranie</label>
+        <label class="one"><input type="checkbox" id="ctlLcdInv"> Odwróć kolory</label></div></div>
+    </div>
+  </section>
+  <section>
+    <h4 class="sh">Klawisze i przyciski</h4>
+    <p class="hint"><b>+</b> — naciśnij klawisz, przycisk myszy, kręć kółkiem albo (w kolumnie SpaceMouse) naciśnij przycisk na SpaceMouse; Esc anuluje.
+      Kliknięcie przypisania usuwa je. Pomarańczowe = to samo przypisane do kilku akcji.</p>
+    <div class="brow bhead"><span>Akcja</span><span>Klawiatura / mysz</span><span>SpaceMouse</span></div>
+    <div id="ctlBinds"></div>
+  </section>
+  <div class="btns"><button id="ctlResetKeys">Domyślne klawisze</button><button id="ctlReset">Wszystko domyślne</button><button id="ctlClose">Gotowe</button></div>
+</div></div>
 <div id="err"></div>
 
 <script src="js/version.js"></script>
+<script src="js/store.js"></script>
 <script src="js/math.js"></script>
 <script src="js/engine.js"></script>
+<script src="js/spacemouse.js"></script>
+<script src="js/input.js"></script>
 <script src="js/glsl.js"></script>
 <script src="js/physics.js"></script>
 <script src="js/weapons.js"></script>
@@ -219,7 +384,10 @@
 <script src="js/worlds/torus.js"></script>
 <script src="js/worlds/lightspeed.js"></script>
 <script src="js/worlds/loops.js"></script>
+<script src="js/worlds/benchmark.js"></script>
 <script src="js/menu.js"></script>
+<script src="js/netui.js"></script>
+<script src="js/video.js"></script>
 <script src="js/update-check.js"></script>
 <script src="js/main.js"></script>
 </body>

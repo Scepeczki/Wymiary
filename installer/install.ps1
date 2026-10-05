@@ -2,12 +2,14 @@
 # Runs from Wymiary-instalator.exe (tools/build-release.ps1 embeds this script), from Zainstaluj.cmd, and from
 # launcher\update.ps1 (the updater runs the installer of the NEW version with -Source, so updates can also change
 # shortcuts and registry entries).
-# Per-user install (no admin rights): %LOCALAPPDATA%\Programs\Wymiary, shortcuts on the desktop and in the Start menu,
-# an entry in "Apps & features", the wymiary:// link (the game's "Aktualizuj" button). runtime\ (Node.js) is kept.
+# Per-user install (no admin rights): %LOCALAPPDATA%\Programs\Wymiary, ONE shortcut "Wymiary" (desktop + Start menu),
+# an entry in "Apps & features" (uninstall), the wymiary:// link (updating a game opened from disk), a portable
+# Node.js in runtime\ (the game's own server; kept between updates).
 #   -Source <dir>  install these already unpacked files      -Zip <file>   install from this release zip
 #   -Update        keep the user's choice of desktop shortcuts (only refresh existing ones)
 #   -Quiet         no dialogs (tests)    -Dest <dir>   install somewhere else (tests)    -NoShortcuts   (tests)
-param([switch]$Quiet, [string]$Dest, [switch]$NoShortcuts, [string]$Zip, [string]$Source, [switch]$Update,
+#   -NoRuntime     do not download Node.js (tests)
+param([switch]$Quiet, [string]$Dest, [switch]$NoShortcuts, [string]$Zip, [string]$Source, [switch]$Update, [switch]$NoRuntime,
       [string]$Repo = 'Scepeczki/Wymiary')
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -42,8 +44,11 @@ try {
   }
   if (-not (Test-Path (Join-Path $Source 'index.html'))) { throw "W $Source nie ma plików gry." }
 
-  # a running server of an older version would lock runtime\node.exe
+  # a running server of an older version would lock runtime\node.exe (also one started with a system-wide Node.js)
   Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($Dest, 'OrdinalIgnoreCase') } | Stop-Process -Force -ErrorAction SilentlyContinue
+  $srv = (Join-Path $Dest 'server\server.js') -replace '\\', '\\'
+  Get-CimInstance Win32_Process -Filter "Name = 'node.exe' AND CommandLine LIKE '%$srv%'" -ErrorAction SilentlyContinue |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
   New-Item -ItemType Directory -Force $Dest | Out-Null
   # replace the program folders entirely (files removed in a new version must not linger); runtime\ stays
   foreach ($d in 'js', 'assets', 'server', 'launcher', 'installer') { Remove-Item -Recurse -Force (Join-Path $Dest $d) -ErrorAction SilentlyContinue }
@@ -57,7 +62,6 @@ try {
     $shell = New-Object -ComObject WScript.Shell
     $desk = [Environment]::GetFolderPath('Desktop')
     $menu = Join-Path ([Environment]::GetFolderPath('Programs')) 'Wymiary'
-    New-Item -ItemType Directory -Force $menu | Out-Null
     $make = {
       param($dir, $name, $target, $arguments, $desc)
       $path = Join-Path $dir "$name.lnk"
@@ -68,14 +72,14 @@ try {
       $l.Save()
     }
     $hidden = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File'
-    foreach ($dir in @($desk, $menu)) {
-      # the game shortcut goes through launcher\play.ps1: it checks GitHub for a newer version, then opens the game
-      & $make $dir 'Wymiary' $ps "$hidden `"$Dest\launcher\play.ps1`"" 'Wymiary — gra (offline: zwiedzanie, boty)'
-      & $make $dir 'Wymiary – dołącz do gry' $ps "$hidden `"$Dest\launcher\join.ps1`"" 'Połącz się z serwerem drugiego gracza'
-      & $make $dir 'Wymiary – gra sieciowa (serwer)' (Join-Path $Dest 'launcher\host.cmd') '' 'Uruchom serwer gry na tym komputerze'
+    # versions before 1.1 had three shortcuts (game, join, server) and a Start menu folder: gone, the game does it all
+    foreach ($old in 'Wymiary – dołącz do gry', 'Wymiary – gra sieciowa (serwer)') { Remove-Item -Force (Join-Path $desk "$old.lnk") -ErrorAction SilentlyContinue }
+    Remove-Item -Recurse -Force $menu -ErrorAction SilentlyContinue
+    # ONE shortcut (desktop + Start menu) → launcher\play.ps1: checks for a newer version, starts the game's server
+    # in the background and opens the game; network games are hosted / joined in the game's menu
+    foreach ($dir in @($desk, [Environment]::GetFolderPath('Programs'))) {
+      & $make $dir 'Wymiary' $ps "$hidden `"$Dest\launcher\play.ps1`"" 'Wymiary — strzelanka w nieeuklidesowych przestrzeniach (gra sieciowa: w menu gry)'
     }
-    & $make $menu 'Wymiary – sprawdź aktualizacje' $ps "$hidden `"$Dest\launcher\update.ps1`"" 'Pobierz najnowszą wersję z GitHuba'
-    & $make $menu 'Odinstaluj Wymiary' $ps "$hidden `"$Dest\launcher\uninstall.ps1`"" 'Usuń grę Wymiary'
 
     $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Wymiary'
     New-Item -Force $key | Out-Null
@@ -90,8 +94,15 @@ try {
     New-ItemProperty -Path $cls -Name 'URL Protocol' -Value '' -Force | Out-Null
     Set-Item "$cls\shell\open\command" "`"$ps`" $hidden `"$Dest\launcher\update.ps1`" -Restart"
   }
+  # Node.js runs the game's own server (needed for network games): a portable one in runtime\, unless the computer
+  # has one already. Without it the game still starts (from disk, alone); the shortcut tries the download again.
+  if (-not $NoRuntime -and -not (Test-Path (Join-Path $Dest 'runtime\node.exe')) -and -not (Get-Command node -ErrorAction SilentlyContinue)) {
+    Busy 'Pobieram Node.js (ok. 30 MB) — potrzebny do gry sieciowej...'
+    try { & (Join-Path $Dest 'launcher\get-node.ps1') | Out-Null } catch { Write-Output "Node.js: $($_.Exception.Message)" }
+    Done
+  }
   if (-not $Update) {
-    Say "Zainstalowano Wymiary, wersja $version.`n`nNa pulpicie są skróty:`n• Wymiary — gra`n• Wymiary – dołącz do gry — gra z drugim graczem`n• Wymiary – gra sieciowa (serwer) — gdy to ty hostujesz`n`nGra sama sprawdza, czy na GitHubie jest nowa wersja."
+    Say "Zainstalowano Wymiary, wersja $version.`n`nNa pulpicie i w menu Start jest skrót Wymiary.`nGra sieciowa (hostowanie i dołączanie) jest w menu gry: „Gra sieciowa”.`n`nGra sama sprawdza, czy na GitHubie jest nowa wersja."
   } else { Write-Output "Zainstalowano wersję $version" }
 } catch {
   Done

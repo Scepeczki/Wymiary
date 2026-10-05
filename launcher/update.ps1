@@ -12,6 +12,8 @@ Add-Type -AssemblyName System.Windows.Forms
 $app = Split-Path -Parent $PSScriptRoot
 function Say($t, $i = 'Information') { if (-not $Quiet) { [System.Windows.Forms.MessageBox]::Show($t, 'Wymiary', 'OK', $i) | Out-Null } else { Write-Output $t } }
 
+# a working copy of the repository is never overwritten by a release
+if (Test-Path (Join-Path $app '.git')) { if (-not $Ask) { Say 'To kopia z repozytorium (git) — aktualizacje z GitHub Releases jej nie dotyczą.' }; exit 0 }
 $repoFile = Join-Path $PSScriptRoot 'repo.txt'
 if (-not (Test-Path $repoFile)) { if (-not $Ask) { Say 'Brak launcher\repo.txt - nie wiem, skąd pobierać aktualizacje.' 'Warning' }; exit 0 }
 $repo = (Get-Content $repoFile -Raw).Trim()
@@ -47,6 +49,7 @@ try {
     # the game window runs in its own browser profile (see play.ps1): close just that one
     Get-CimInstance Win32_Process -Filter "CommandLine LIKE '%Wymiary\\browser-profile%'" -ErrorAction SilentlyContinue |
       ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    Start-Sleep -Milliseconds 500
   }
   # the installer of the NEW version does the copying (it may know about new files, shortcuts, ...)
   $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'

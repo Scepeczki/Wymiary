@@ -1,12 +1,14 @@
-// Checks GitHub Releases for a newer version of the game and offers it in the menu. Only in an installed copy opened
-// from disk: a game joined through another player's server runs that server's version, and 'dev' (the repository)
-// is never "updated". "Aktualizuj teraz" opens wymiary://update — the installer registers it to run
-// launcher\update.ps1 -Restart, which closes this window, installs the new version and starts the game again.
+// Checks GitHub Releases for a newer version of the game and offers it in the menu. Only in an installed copy (opened
+// by the Wymiary shortcut, or from disk); 'dev' (the repository) is never "updated". "Aktualizuj teraz" asks the
+// game's own server (or, from disk, the wymiary:// link) to run launcher\update.ps1 -Restart, which closes this
+// window, installs the new version and starts the game again.
 (function () {
   const W = window.WYMIARY || { version: 'dev' };
   const $ = id => document.getElementById(id);
   $('ver').textContent = W.version === 'dev' ? 'wersja deweloperska' : 'wersja ' + W.version;
-  if (location.protocol !== 'file:' || W.version === 'dev' || !W.repo) return;
+  // an installed copy: opened from disk, or (the Wymiary shortcut) from the game's own server on 127.0.0.1:47816
+  const own = location.port === '47816' && /^(localhost|127.0.0.1)$/.test(location.hostname);
+  if ((location.protocol !== 'file:' && !own) || W.version === 'dev' || !W.repo) return;
 
   // 1.0.10 > 1.0.9; anything that is not such a number (an old build) counts as older
   const parse = v => /^\d+(\.\d+)*$/.test(v) ? v.split('.').map(Number) : null;
@@ -35,7 +37,10 @@
     e.stopPropagation();
     $('upd').querySelector('small').textContent = 'Pobieram aktualizację… gra uruchomi się ponownie sama.\n' +
       '(Jeśli przeglądarka zapyta o otwarcie aplikacji, zgódź się. Gdy nic się nie dzieje: zamknij grę i włącz ją skrótem Wymiary.)';
-    location.href = 'wymiary://update';
+    // the game's own server runs the updater; opened from disk: through the wymiary:// link the installer registered
+    if (own) fetch('/api/update', { method: 'POST', headers: { 'X-Wymiary': '1' } }).then(r => r.json())
+      .then(r => { if (!r.ok) $('upd').querySelector('small').textContent = r.error; }).catch(() => { location.href = 'wymiary://update'; });
+    else location.href = 'wymiary://update';
   });
   check();
   setInterval(check, 30 * 60 * 1000);

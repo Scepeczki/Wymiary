@@ -8,19 +8,25 @@ zmienna krzywizna, wolne światło. Gra sieciowa dla dwóch graczy.
 1. Pobierz instalator: **[Wymiary-instalator.exe](https://github.com/Scepeczki/Wymiary/releases/latest/download/Wymiary-instalator.exe)**
    (albo ze strony [Releases](https://github.com/Scepeczki/Wymiary/releases/latest) → *Assets*).
 2. Uruchom go. Jeśli Windows ostrzeże („system Windows ochronił komputer”), kliknij *Więcej informacji* → *Uruchom mimo to*.
-3. Instalator pobierze najnowszą wersję gry z GitHuba, a na pulpicie pojawią się skróty.
+3. Instalator pobierze najnowszą wersję gry z GitHuba i przenośny Node.js (ok. 30 MB, tylko dla gry), a na pulpicie
+   i w menu Start pojawi się **jeden skrót: Wymiary**.
 
 Potrzebna jest przeglądarka Chrome, Brave albo Edge. Uprawnienia administratora nie są potrzebne.
+Odinstalowanie: *Ustawienia → Aplikacje → Wymiary*.
 
 **Aktualizacje:** gra sama sprawdza, czy na GitHubie jest nowsze wydanie. Przy starcie skrótu *Wymiary* pyta, czy je
 pobrać, a w trakcie gry pokazuje w menu ramkę **Nowa wersja… → Aktualizuj teraz** (gra zamknie się, zaktualizuje
-i uruchomi ponownie). W menu Start jest też *Wymiary – sprawdź aktualizacje*. *Wymiary – dołącz do gry* dodatkowo
-wyrównuje wersję z serwerem, do którego się łączysz.
+i uruchomi ponownie).
 
-**Gra we dwóch — na każdej mapie i w każdym trybie:** jeden gracz uruchamia *Wymiary – gra sieciowa (serwer)* (za pierwszym
-razem gra sama pobierze przenośny Node.js), drugi *Wymiary – dołącz do gry* i wpisuje adres pokazany w oknie serwera.
-W menu widać, na której mapie gra drugi gracz (przycisk **Dołącz**). Z innego domu: oba komputery w tej samej sieci
-[Tailscale](https://tailscale.com) → adres `100.x.x.x:8080`.
+**Gra we dwóch — na każdej mapie i w każdym trybie** — wszystko w jednym oknie gry, menu → **🌐 Gra sieciowa**:
+jeden gracz klika **Hostuj grę** (gra pokaże jego adres, np. `192.168.1.55:8080`), drugi wpisuje ten adres i klika
+**Dołącz**. W menu widać, na której mapie gra drugi gracz (przycisk **Dołącz** przy mapie). Z innego domu: oba komputery
+w tej samej sieci [Tailscale](https://tailscale.com) → adres `100.x.x.x:8080`.
+
+**Jak to działa:** skrót uruchamia w tle mały serwer gry (`server/server.js --app`, Node.js) i otwiera okno gry
+na `http://localhost:47816`. Adres jest zawsze ten sam, więc przeglądarka pamięta ustawienia, a SpaceMouse (WebHID)
+działa. „Hostuj grę” otwiera dla drugiego gracza port 8080. Po zamknięciu okna serwer kończy pracę sam. Bez Node.js
+gra otwiera się z dysku (gra w pojedynkę). Dziennik serwera: `%LOCALAPPDATA%\Wymiary\server.log`.
 
 ## Wydawanie aktualizacji (dla autora)
 
@@ -30,17 +36,25 @@ GitHub Actions (`.github/workflows/release.yml`) samo zbuduje i opublikuje nowe 
 Postęp widać w zakładce **Actions** repozytorium, gotowe wydania w **Releases**.
 
 - Wydanie powstaje tylko wtedy, gdy zmieniły się pliki gry (nie np. samo README). Push bez wydania: dopisz `[skip ci]` do opisu commita.
-- Nowa seria numerów: zmień plik `VERSION` (np. `1.0` → `1.1`).
-- Wydanie ręcznie: *Actions → Release → Run workflow*. Lokalny test budowania:
-  `powershell -ExecutionPolicy Bypass -File tools\build-release.ps1 -Version 1.0.99` → folder `dist\`.
+- **Nic nie zostanie opublikowane, jeśli coś nie działa.** Najpierw idą testy gry bez GPU (`tools/dev`: smoke, mpsim, swarm,
+  tutorial, levels, islands). Po zbudowaniu `tools\test-release.ps1` instaluje paczkę do katalogu tymczasowego tak jak
+  instalator, uruchamia z niej serwer gry i sprawdza: zawartość paczki, wersję, podawanie gry, blokadę API, hostowanie
+  i sprawdzanie wersji przy dołączaniu.
+- Nowa seria numerów: zmień plik `VERSION` (teraz `1.1`: jeden skrót i gra sieciowa w menu).
+- Wydanie ręcznie: *Actions → Release → Run workflow*. Lokalnie to samo:
+  `powershell -ExecutionPolicy Bypass -File tools\build-release.ps1 -Version 1.1.99` → folder `dist\`, potem
+  `powershell -ExecutionPolicy Bypass -File tools\test-release.ps1`.
 
 ---
 
 ## Uruchamianie (komputer autora)
 
-- Ikona **Wymiary** na pulpicie (albo `Wymiary.lnk` w tym folderze) — otwiera grę w Brave w trybie aplikacji.
-- Skrót odtworzysz poleceniem: `powershell -ExecutionPolicy Bypass -File tools\install-shortcut.ps1`
-  (szuka Brave → Chrome → Edge; bez nich otwiera `index.html` w domyślnej przeglądarce).
+- Kopia z repozytorium: `powershell -ExecutionPolicy Bypass -File launcher\play.ps1` (potrzebny Node.js w PATH). To samo co
+  skrót z instalatora, ale bez aktualizacji z GitHuba (kopii z `.git` aktualizator nie rusza).
+- Skrót **Wymiary** do tej kopii (pulpit + ten folder): `powershell -ExecutionPolicy Bypass -File tools\install-shortcut.ps1`.
+  Uwaga: zastępuje skrót *Wymiary* na pulpicie, który zrobił instalator.
+- Osobny serwer gry sieciowej (bez okna gry, np. na stałe włączony komputer): `node server\server.js [--port 8080]`.
+  Gracze dołączają do niego z menu tak samo, a bez gry wystarczy przeglądarka: `http://<adres>:8080/`.
 - Ikonę generuje `tools\make-icon.ps1`.
 
 ## Sterowanie
@@ -61,6 +75,38 @@ Postęp widać w zakładce **Actions** repozytorium, gotowe wydania w **Releases
 | 4D: F | (układ ustawisz w menu: **⚙ Układ widoków 4D** — dla każdej ćwiartki kamera albo pusta, gizmo wł./wył.; zapamiętywane) **cztery widoki** naraz — przekroje przez różne trójki twoich osi (x = w prawo, y = do przodu, z = w górę, w = ana): (x y z) zwykły, (w y z) zamiast „w prawo” oś W, (x w z) patrzysz wzdłuż W, (x y w) zamiast wysokości oś W (poziomy przekrój 3D na wysokości oczu) |
 | Korytarze K: Q/E, X | K całej mapy, płasko (to samo suwakiem w menu); tryb z potworami wybierasz na karcie mapy |
 | Wolne światło: Q/E, L, F, B/J/K | prędkość światła, wszystkie lampy, lampa na celowniku, aberracja / Doppler / opóźnienie światła |
+
+Powyżej są klawisze domyślne. **Wszystkie** zmienisz w menu: **⌨ Sterowanie** (u góry menu). Każdą akcję można przypisać
+do kilku klawiszy, przycisków myszy, kółka i przycisków SpaceMouse.
+
+**Ustawienia gracza** (sterowanie, SpaceMouse, obraz, układ widoków 4D, postępy samouczka, ostatni adres hosta) zapisują się
+w pliku `%LOCALAPPDATA%\Wymiary\settings.json` (`js/store.js` przez serwer gry). Dzięki temu przetrwają aktualizacje,
+reinstalację i reset przeglądarki.
+
+**🖥 Obraz** (menu): automatyczna rozdzielczość dla stałego FPS. Wybierasz cel (30–144 FPS) i zakres rozdzielczości renderu,
+a gra dwa razy na sekundę dobiera rozdzielczość według czasu renderu na karcie (timer GPU) i czasu klatki. Każda mapa
+pamięta swoją rozdzielczość. Opcjonalny limit klatek do celu. Klawisze `[` `]` ustawiają rozdzielczość ręcznie i wyłączają
+tryb automatyczny. HUD pokazuje FPS, rozdzielczość oraz czas GPU i CPU klatki.
+
+### SpaceMouse (3Dconnexion)
+
+Manipulatory 6-DOF 3Dconnexion (SpacePilot, SpaceNavigator, SpaceExplorer, SpaceMouse Pro / Wireless / Compact…) działają
+**bez sterowników 3Dconnexion**: gra czyta urządzenie przez WebHID przeglądarki (`js/spacemouse.js`). Za pierwszym razem
+w **⌨ Sterowanie** kliknij **🔌 Połącz SpaceMouse** i wybierz urządzenie. Później gra łączy się z nim sama, także
+po ponownym podłączeniu.
+
+- Sześć osi urządzenia (TX / TY / TZ — przesuw kapturka wzdłuż X / Y / Z, RX / RY / RZ — obrót wokół X / Y / Z). Każdej
+  przypisujesz cel w osiach gracza: ruch wzdłuż x / y / z / w albo obrót w płaszczyźnie x–y, y–z, y–w lub x–w. Do tego
+  **odwrócenie** i czułość, a wspólnie czułość ogólna, martwa strefa i krzywa odpowiedzi. Pasek obok osi pokazuje
+  wychylenie na żywo, a **kompas 4D** pod osiami pokazuje gracza testowego, którym SpaceMouse steruje jak na mapie 4D.
+  Od razu widać, co która oś robi.
+- Domyślnie: TX → ruch wzdłuż x, TY → y, TZ → z (lot), RX → obrót y–z (patrzenie), RY → ruch wzdłuż w, RZ → obrót x–y.
+  Przyciski: SM 1 strzał, SM 2 skok, SM 3 przeładowanie, SM 4 kamera 4D, SM 5 cztery widoki, SM 6 reset obrotu 4D.
+- **Ekran LCD** (oryginalny SpacePilot, 046D:C625, 240×64): gra pokazuje na nim mapę, tryb, amunicję i zdrowie, w 4D
+  współrzędną w i kamerę, a na dole wychylenie sześciu osi. Podgląd ekranu jest w oknie Sterowanie (można odwrócić kolory).
+  Protokół ekranu (raporty feature 0x12 / 0x0C / 0x0D / 0x0E) opisało [3dxdisp](https://github.com/jtsiomb/3dxdisp).
+- Bez WebHID (inna przeglądarka) gra próbuje Gamepad API: osie i przyciski działają, ekran nie.
+- Rozpoczęcie gry nadal wymaga kliknięcia myszą (przeglądarka przechwytuje kursor tylko po kliknięciu).
 
 ## Światy
 
@@ -94,7 +140,32 @@ Postęp widać w zakładce **Actions** repozytorium, gotowe wydania w **Releases
 9. **Wolne światło** — szczególna teoria względności z regulowanym c (patrz niżej).
 10. **Arena pętli** — długa mapa dwóch baz, prawie wszędzie zapętlona; bot albo gra sieciowa (patrz niżej).
 
-W grze mapy 1–9 wybierasz cyframi, a mapę 10 (Arena pętli) klawiszem **0**.
+11. **Benchmark: Osobliwość** — scena do testów wydajności (patrz niżej).
+
+W grze mapy 1–9 wybierasz cyframi, a mapę 10 (Arena pętli) klawiszem **0**. Mapa 11 jest tylko w menu.
+
+## Benchmark: Osobliwość
+
+Ciężka scena do porównywania kart, ekranów i ustawień (`js/worlds/benchmark.js`):
+- **czarna dziura** zakrzywiająca światło: promienie biegną po geodezyjnych metryki g = e^{2φ}·δ, φ = M/r (jak współczynnik
+  załamania n ≈ 1 + 2GM/rc²). Widać ciemny horyzont, pierścień fotonowy i soczewkowane niebo z gwiazdami. Do tego dysk
+  akrecyjny (jaśniejszy tam, gdzie gaz leci w twoją stronę) i dżety z biegunów, liczone jako świecący gaz wzdłuż promienia;
+- dwie **krążące soczewki grawitacyjne** (widać tylko małe jądra) wyginają fraktale i wiązki;
+- **fraktale**: Mandelbulb (kolor wg orbity), wieże z gąbki Mengera, obracający się trójkąt Sierpińskiego 3D;
+- spiralne **wiązki energii** między pylonami, pulsująca podłoga, **odbicia** (drugi marsz promienia) i miękkie cienie.
+
+Na karcie mapy wybierz tryb **Benchmark** i kliknij GRAJ. Kamera przelatuje 60 s po stałej trasie przez 6 scen
+(po 3 s rozgrzewki; najpierw benchmark czeka, aż wszystkie mapy skompilują się w tle). Dostępne są dwa warianty:
+- **z ustawieniami „Obraz”**: na przykład automatyczna rozdzielczość, żeby sprawdzić, w jakiej rozdzielczości karta trzyma cel;
+- **natywna rozdzielczość** (100%, bez limitu klatek): czysty test karty, potem ustawienia obrazu wracają.
+
+Wynik pojawia się w menu przy mapie: średnie FPS, 1% i 0,1% low, mediana i najdłuższe klatki (z miejscem na trasie),
+czas GPU (timer GPU, niezależny od odświeżania ekranu), rozdzielczość renderu, karta, ekran i częstotliwość odświeżania,
+ustawienia mapy oraz wyniki każdej sceny. Historia zapisuje się z ustawieniami gracza, a przycisk **Kopiuj wyniki** daje tekst
+do porównań. Suwaki mapy (detal fraktali, grawitacja, wiązki i gaz, cienie, odbicia) wchodzą do wyniku. Przy porównaniach
+liczy się przede wszystkim **czas GPU**, bo FPS jest ograniczony odświeżaniem ekranu.
+
+Przykład: RTX 4080 Super, render 3840×1953 (pełne 4K), ustawienia domyślne: ok. 13 ms GPU (scena „Czarna dziura” ok. 15 ms).
 
 **Osie w 4D** (wszystkie mapy 4D, HUD i kompas): x i y to podłoga, z to wysokość, w to czwarta oś. W lewym dolnym rogu
 stale widać **gizmo osi**: dokąd wskazują osie świata względem kamery, przez którą patrzysz, i jaka ich część leży poza
@@ -167,10 +238,10 @@ chowa się, przeładowuje, wychyla. Geometria i portale są w teksturze danych (
 
 ## Gra sieciowa (np. z bratem) — każda mapa, każdy tryb
 
-1. Na swoim komputerze uruchom skrót **„Wymiary – gra sieciowa (serwer)”** (`launcher\host.cmd`). Otworzy się okno serwera
-   z adresami i gra (menu map).
-2. Brat klika **„Wymiary – dołącz do gry”** i wpisuje adres z okna serwera (np. `192.168.1.55:8080`, a przez Tailscale
-   adres `100.x.x.x:8080`). Bez instalacji wystarczy przeglądarka: `http://192.168.1.55:8080/`.
+1. Uruchom grę skrótem **Wymiary**, w menu kliknij **🌐 Gra sieciowa → Hostuj grę**. Gra pokaże adresy dla drugiego gracza.
+2. Brat w swojej grze: **🌐 Gra sieciowa**, wpisuje adres (np. `192.168.1.55:8080`, a przez Tailscale `100.x.x.x:8080`)
+   i klika **Dołącz**. Gra sprawdza, czy obaj macie tę samą wersję; jeśli nie, podpowiada aktualizację (można połączyć
+   się mimo to). Bez instalacji wystarczy przeglądarka: `http://192.168.1.55:8080/`.
 3. Obaj wybieracie w menu **tę samą mapę i ten sam tryb** — karta mapy pokazuje, kto na niej gra, a w panelu mapy jest
    przycisk **Dołącz** (wybiera mapę i tryb drugiego gracza). Gra otwarta z serwera sama podpowiada mapę, na której ktoś już gra.
 4. Jeśli Windows zapyta o zaporę — zezwól na sieci prywatne.
@@ -190,8 +261,8 @@ w 3D, cała rama w 4D i w H³/S³). H³ ciągle przecentrowuje świat na gracza,
 Testy: `node tools/dev/mpsim.js` (dwóch klientów w jednym procesie, wszystkie mapy i tryby) i
 `node tools/dev/mptest.js <katalog> [mapa] [tryb] …` (serwer + dwa okna przeglądarki, zrzuty ekranu).
 
-**Aktualizacje przez serwer:** „Dołącz do gry” porównuje sumy SHA-256 plików z serwerem i pobiera tylko zmienione, więc brat
-gra zawsze tą samą wersją co serwer. Niezależnie od tego zainstalowana gra sama pobiera nowe wydania z GitHuba (patrz wyżej).
+**Wersje:** przy dołączaniu gra porównuje sumę SHA-256 wszystkich plików gry u siebie i u hosta (`/api/manifest`).
+Nowe wersje przychodzą z GitHuba (patrz wyżej), więc wystarczy, że obaj macie aktualną grę.
 
 ## Strzelanie
 
@@ -211,6 +282,15 @@ zdarzenie na listę *dojść* (opóźnienie, głośność, kierunek, stłumienie
 - **Korytarze K** — śledzenie ~200 promieni dźwięku po geodezyjnych metryki: skupianie przez soczewki (głośniej),
   wielokrotne drogi, przy K>0 obieganie wszechświata. Liczone porcjami między klatkami; ściany są pomijane.
 - `node tools/dev/sound.js` wypisuje dojścia dla każdego świata.
+
+## Wydajność
+
+Każda mapa to jeden shader ray-marchingu na GPU. Kolizje gracza, pociski i potwory pytają ten sam shader o odległość
+(„sondy”). Sondy są **asynchroniczne** (`WE.probeLater` w `js/engine.js`): wszystkie zapytania klatki idą jednym przebiegiem
+do bufora z fence, a wynik przychodzi w następnej klatce, więc procesor nie czeka na kartę. Gracz liczy kolizję z
+pomiaru poprzedniej klatki z liniową poprawką (odległość + normalna). Synchronicznie czeka tylko po teleporcie lub respawnie
+i w H³/S³. Wcześniej czekanie na sondy zajmowało 4–43 ms na klatkę (cały render poprzedniej klatki), teraz ok. 1 ms.
+Przy pełnej rozdzielczości np. Samouczek 4D ma 60 zamiast 21 FPS, a Labirynt 4D 60 zamiast 45 (RTX 4050 Laptop, 1600×900).
 
 ## Ładowanie
 
